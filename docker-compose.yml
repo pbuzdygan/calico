@@ -1,0 +1,25 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - .env
+    environment:
+      - SQLITE_PATH=/data/calico.db
+    volumes:
+      - calico_data:/data
+    restart: unless-stopped
+
+  proxy:
+    image: caddy:2.8.4-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend:/srv:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  calico_data:

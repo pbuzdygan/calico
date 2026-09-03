@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CALICO</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">C</div>
+          <div>
+            <p class="brand-eyebrow">CALICO</p>
+            <h1>Calorie Console</h1>
+          </div>
+        </div>
+
+        <nav class="tabs" aria-label="Sekcje aplikacji">
+          <button class="tab-btn active" data-tab="chatPanel">Dzien</button>
+          <button class="tab-btn" data-tab="journalPanel">Dziennik</button>
+          <button class="tab-btn" data-tab="reportsPanel">Raporty</button>
+          <button class="tab-btn" data-tab="userPanel">Uzytkownik</button>
+          <button class="tab-btn" data-tab="adminPanel">Admin</button>
+        </nav>
+
+        <div class="auth-strip">
+          <div class="auth-field auth-compact">
+            <label for="userSelect">Uzytkownik</label>
+            <div class="auth-inline">
+              <select id="userSelect"></select>
+              <button id="newUserBtn" class="ghost" type="button">Nowy</button>
+              <button id="unlockToggleBtn" type="button">Odblokuj</button>
+            </div>
+            <div id="pinPopover" class="pin-popover is-hidden">
+              <label for="pinInput">PIN</label>
+              <div class="pin-row">
+                <input id="pinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="4-8 cyfr" />
+                <button id="unlockBtn" type="button">Potwierdz</button>
+              </div>
+            </div>
+          </div>
+          <p id="authStatus" class="auth-status">Wymagane odblokowanie PIN.</p>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="main-column">
+          <section id="chatPanel" class="panel tab-panel active user-protected-panel">
+            <div class="lockable-body">
+              <div class="operator-layout">
+                <div class="operator-side">
+                  <section class="operator-entry">
+                    <div class="section-head">
+                      <h3>Szybki wpis</h3>
+                      <p class="muted">Wybierasz typ wpisu i od razu edytujesz gotowy szablon.</p>
+                    </div>
+
+                    <div class="template-actions template-actions-stack">
+                      <button class="ghost template-btn" type="button" data-template="weight">Waga</button>
+                      <button class="ghost template-btn" type="button" data-template="waist">Obwod pasa</button>
+                      <button class="ghost template-btn" type="button" data-template="breakfast">Sniadanie</button>
+                      <button class="ghost template-btn" type="button" data-template="lunch">Obiad</button>
+                      <button class="ghost template-btn" type="button" data-template="dinner">Kolacja</button>
+                      <button class="ghost template-btn" type="button" data-template="snack">Przekaska</button>
+                      <button class="ghost template-btn" type="button" data-template="daily_balance">Bilans dnia</button>
+                    </div>
+
+                    <div class="template-guide">
+                      <strong>Zasada daty</strong>
+                      <p class="muted">
+                        Dodaj na gorze <code>Data: YYYY-MM-DD</code>, <code>DD.MM.YYYY</code>, <code>DD-MM-YYYY</code> albo <code>DD/MM/YYYY</code>, jezeli wpis ma trafic do innego dnia.
+                      </p>
+                    </div>
+
+                    <div id="entryFeedback" class="entry-feedback is-hidden" aria-live="polite"></div>
+
+                    <form id="chatForm" class="composer operator-composer">
+                      <textarea id="messageInput" rows="10" spellcheck="false"></textarea>
+                      <div class="operator-actions inline-actions">
+                        <button type="submit">Zapisz wpis</button>
+                        <button id="clearDraftBtn" class="ghost" type="button">Wyczysc</button>
+                      </div>
+                    </form>
+                  </section>
+                </div>
+              </div>
+            </div>
+            <div class="panel-lock">
+              <h3>Panel zablokowany</h3>
+              <p class="lock-copy">Wybierz uzytkownika i podaj jego PIN, aby zobaczyc dane dnia, wpisy i status operacji.</p>
+            </div>
+          </section>
+
+          <section id="journalPanel" class="panel tab-panel user-protected-panel">
+            <div class="lockable-body">
+              <div class="panel-head">
+                <h2>Dziennik</h2>
+                <div class="toolbar-row">
+                  <label class="compact-label" for="daySelect">Dzien</label>
+                  <select id="daySelect"></select>
+                  <button id="refreshDayBtn" class="ghost" type="button">Odswiez</button>
+                </div>
+              </div>
+              <div class="toolbar-row wrap">
+                <button id="showBtn" class="ghost" type="button">Pokaz dzis</button>
+                <button id="undoBtn" class="ghost" type="button">Cofnij ostatni</button>
+                <button id="closeBtn" class="ghost" type="button">Podsumuj dzien</button>
+                <button id="clearDayBtn" class="ghost danger" type="button">Wyczysc dzien</button>
+              </div>
+              <div id="journalMeta" class="meta-line">Brak danych dnia.</div>
+              <div id="journalMeals" class="meal-list"></div>
+            </div>
+            <div class="panel-lock">
+              <h3>Dziennik zablokowany</h3>
+              <p class="lock-copy">Podaj PIN wybranego uzytkownika, aby przegladac i edytowac jego wpisy.</p>
+            </div>
+          </section>
+
+          <section id="reportsPanel" class="panel tab-panel user-protected-panel">
+            <div class="lockable-body">
+              <div class="panel-head">
+                <h2>Raporty</h2>
+                <div class="toolbar-row wrap">
+                  <button class="ghost report-preset" data-days="5" type="button">5 dni</button>
+                  <button class="ghost report-preset active" data-days="7" type="button">7 dni</button>
+                  <button class="ghost report-preset" data-days="30" type="button">30 dni</button>
+                </div>
+              </div>
+
+              <div class="toolbar-row wrap report-tools">
+                <input id="reportFrom" type="date" />
+                <input id="reportTo" type="date" />
+                <button id="reportRangeBtn" class="ghost" type="button">Zakres</button>
+                <input id="reportMonth" type="month" />
+                <button id="reportMonthBtn" class="ghost" type="button">Miesiac</button>
+              </div>
+
+              <div class="metrics-grid">
+                <article class="metric">
+                  <h3>Srednia kcal</h3>
+                  <strong id="metricAverage">-</strong>
+                </article>
+                <article class="metric">
+                  <h3>Suma kcal</h3>
+                  <strong id="metricTotal">-</strong>
+                </article>
+                <article class="metric">
+                  <h3>Dni powyzej celu</h3>
+                  <strong id="metricAbove">-</strong>
+                </article>
+                <article class="metric">
+                  <h3>Wpisy</h3>
+                  <strong id="metricEntries">-</strong>
+                </article>
+              </div>
+
+              <div id="reportChart" class="chart"></div>
+              <div id="reportTable" class="report-table"></div>
+            </div>
+            <div class="panel-lock">
+              <h3>Raporty zablokowane</h3>
+              <p class="lock-copy">Wykresy, trendy i dane okresowe pojawia sie dopiero po poprawnym PIN-ie.</p>
+            </div>
+          </section>
+
+          <section id="userPanel" class="panel tab-panel user-protected-panel">
+            <div class="lockable-body">
+              <div class="panel-head">
+                <h2>Uzytkownik</h2>
+              </div>
+              <form id="profileForm" class="profile-form">
+                <div class="field">
+                  <label>Plec</label>
+                  <select name="sex">
+                    <option value="male">Mezczyzna</option>
+                    <option value="female">Kobieta</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Wiek</label>
+                  <input type="number" name="age" value="30" min="10" max="100" step="1" required />
+                </div>
+                <div class="field">
+                  <label>Wzrost cm</label>
+                  <input type="number" name="height_cm" value="175" min="120" max="230" step="1" required />
+                </div>
+                <div class="field">
+                  <label>Waga kg</label>
+                  <input type="number" name="weight_kg" value="80" min="30" max="300" step="0.1" required />
+                </div>
+                <div class="field">
+                  <label>Aktywnosc</label>
+                  <select name="activity_level">
+                    <option value="sedentary">Siedzacy tryb</option>
+                    <option value="light">Lekka aktywnosc</option>
+                    <option value="moderate">Umiarkowana aktywnosc</option>
+                    <option value="high">Wysoka aktywnosc</option>
+                    <option value="athlete">Sportowiec</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Cel</label>
+                  <select name="goal_type">
+                    <option value="cut">Redukcja</option>
+                    <option value="maintain">Utrzymanie</option>
+                    <option value="bulk">Masa</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Korekta celu (%)</label>
+                  <input type="number" name="goal_delta_pct_percent" step="1" min="0" max="30" value="0" />
+                  <p class="hint">Dla utrzymania 0%. Redukcja zwykle 10-20%. Masa zwykle 5-15%.</p>
+                </div>
+                <button type="submit">Zapisz profil</button>
+              </form>
+              <p id="profileStatus" class="form-status" aria-live="polite"></p>
+              <div class="danger-zone">
+                <h3>Strefa usuwania</h3>
+                <p class="hint">Po poprawnym PIN-ie mozesz usunac swoje konto. Z bazy znikna tez wszystkie dni i wpisy tego usera.</p>
+                <button id="deleteUserBtn" class="danger" type="button">Usun moje konto</button>
+              </div>
+            </div>
+            <div class="panel-lock">
+              <h3>Profil zablokowany</h3>
+              <p class="lock-copy">Parametry profilu i opcja usuniecia konta sa dostepne dopiero po weryfikacji PIN-u.</p>
+            </div>
+          </section>
+
+          <section id="adminPanel" class="panel tab-panel">
+            <div class="panel-head">
+              <h2>Admin</h2>
+            </div>
+            <div class="admin-auth">
+              <div class="field">
+                <label for="adminPinInput">Admin PIN</label>
+                <div class="row-inline">
+                  <input id="adminPinInput" type="password" maxlength="64" placeholder="PIN admina" />
+                  <button id="adminUnlockBtn" type="button">Odblokuj</button>
+                </div>
+              </div>
+              <p id="adminStatus" class="form-status">Tryb administracyjny nieaktywny.</p>
+            </div>
+
+            <div class="admin-layout">
+              <div class="field">
+                <label for="adminUserSelect">User z logami</label>
+                <select id="adminUserSelect"></select>
+              </div>
+              <div class="toolbar-row wrap">
+                <button id="adminRefreshBtn" class="ghost" type="button">Odswiez</button>
+                <button id="adminLoadLogsBtn" class="ghost" type="button">Pokaz logi</button>
+              </div>
+              <div id="adminSummary" class="meta-line">Brak danych diagnostycznych.</div>
+              <div id="adminLogs" class="admin-log-list"></div>
+            </div>
+          </section>
+        </section>
+
+        <aside class="day-card panel user-protected-panel">
+          <div class="lockable-body">
+            <section class="day-card-block">
+              <div class="section-head">
+                <h2>Karta dnia</h2>
+                <p class="muted">Najwazniejsze liczby bez przechodzenia do raportow.</p>
+              </div>
+              <div class="status-list">
+                <div class="status-line"><span>Kalorie</span><span id="dayCaloriesCompact">-</span></div>
+                <div class="status-line"><span>Weglowodany</span><span id="carbsTotal">-</span></div>
+                <div class="status-line"><span>Tluszcze</span><span id="fatTotal">-</span></div>
+                <div class="status-line"><span>Bialko</span><span id="proteinTotal">-</span></div>
+              </div>
+            </section>
+
+            <section class="day-card-block">
+              <div class="section-head">
+                <h3>Raport 7 dni</h3>
+                <p class="muted">Biala linia oznacza cel kaloryczny dnia.</p>
+              </div>
+              <div id="miniReportChart" class="mini-report-chart"></div>
+            </section>
+          </div>
+          <div class="panel-lock">
+            <h3>Karta dnia zablokowana</h3>
+            <p class="lock-copy">Stan kalorii i makro pojawi sie dopiero po podaniu PIN-u wybranego uzytkownika.</p>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <script src="/main.js"></script>
+  </body>
+</html>

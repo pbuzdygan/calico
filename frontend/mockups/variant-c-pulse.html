@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CALICO / Pulse Board</title>
+    <link rel="stylesheet" href="./mockups.css" />
+    <style>
+      .mockup-c {
+        color: #ecf8fb;
+        background:
+          radial-gradient(circle at top right, rgba(242, 181, 79, 0.2), transparent 24%),
+          radial-gradient(circle at bottom left, rgba(42, 201, 177, 0.16), transparent 22%),
+          linear-gradient(165deg, #071d2a 0%, #0b2c3d 48%, #124e66 100%);
+      }
+
+      .mockup-c .topbar,
+      .mockup-c .panel {
+        background: rgba(8, 31, 45, 0.52);
+        border: 1px solid rgba(191, 227, 236, 0.1);
+        box-shadow: 0 22px 48px rgba(0, 0, 0, 0.2);
+      }
+
+      .mockup-c .brand-mark {
+        background: linear-gradient(135deg, #24c7ac, #f0b04a);
+        color: #0b2c3d;
+      }
+
+      .mockup-c .nav-tabs {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .mockup-c .nav-tabs a {
+        color: rgba(236, 248, 251, 0.78);
+      }
+
+      .mockup-c .nav-tabs a.active,
+      .mockup-c .solid-btn,
+      .mockup-c .template-tab.active {
+        background: #eef8fb;
+        color: #0d2d3f;
+      }
+
+      .mockup-c .status-card,
+      .mockup-c .template-card,
+      .mockup-c .feed-card,
+      .mockup-c .entry-card,
+      .mockup-c .mini-card,
+      .mockup-c .metric-card,
+      .mockup-c .report-card,
+      .mockup-c .action-card,
+      .mockup-c .day-list-item,
+      .mockup-c .table-row,
+      .mockup-c .status-line,
+      .mockup-c .template-preview {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .mockup-c .ghost-btn,
+      .mockup-c .soft-btn,
+      .mockup-c .template-tab {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(255, 255, 255, 0.1);
+      }
+
+      .mockup-c .report-chart .bar span {
+        background: linear-gradient(180deg, #28ceb4, #f0b04a);
+      }
+    </style>
+  </head>
+  <body class="mockup-page mockup-c">
+    <div class="mockup-frame">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">C</div>
+          <div class="brand-copy">
+            <p>CALICO</p>
+            <h1>Pulse Board</h1>
+          </div>
+        </div>
+        <nav class="nav-tabs">
+          <a class="active" href="#">Dashboard</a>
+          <a href="#">Dziennik</a>
+          <a href="#">Raporty</a>
+          <a href="#">Admin</a>
+        </nav>
+        <a class="back-link" href="./index.html">Powrot do galerii</a>
+      </header>
+
+      <main class="mockup-shell">
+        <section class="strip-grid">
+          <article class="mini-card">
+            <div class="meta-kicker">Dzisiaj</div>
+            <strong>1875 / 2400</strong>
+          </article>
+          <article class="mini-card">
+            <div class="meta-kicker">Bialko</div>
+            <strong>89 g</strong>
+          </article>
+          <article class="mini-card">
+            <div class="meta-kicker">Waga</div>
+            <strong>82.4 kg</strong>
+          </article>
+          <article class="mini-card">
+            <div class="meta-kicker">Pas</div>
+            <strong>91 cm</strong>
+          </article>
+        </section>
+
+        <section class="variant-layout layout-pulse">
+          <div class="stack">
+            <section class="panel">
+              <div class="panel-head">
+                <div class="panel-title">
+                  <h2>Karta dnia z trendem</h2>
+                  <p class="muted-copy">Ten kierunek zaczyna od stanu dnia, potem prowadzi do wpisow. Dobry, jezeli raport ma byc stale pod reka.</p>
+                </div>
+                <div class="toolbar-row">
+                  <div class="ghost-btn">5 dni</div>
+                  <div class="solid-btn">7 dni</div>
+                  <div class="ghost-btn">30 dni</div>
+                </div>
+              </div>
+              <div class="metric-grid four">
+                <article class="metric-card">
+                  <h4>Cel</h4>
+                  <strong>2400</strong>
+                </article>
+                <article class="metric-card">
+                  <h4>Suma</h4>
+                  <strong>1875</strong>
+                </article>
+                <article class="metric-card">
+                  <h4>Roznica</h4>
+                  <strong>-525</strong>
+                </article>
+                <article class="metric-card">
+                  <h4>Pozycje</h4>
+                  <strong>8</strong>
+                </article>
+              </div>
+              <div class="report-chart">
+                <div class="bar"><span style="height: 92px"></span><small>28.07</small></div>
+                <div class="bar"><span style="height: 118px"></span><small>29.07</small></div>
+                <div class="bar"><span style="height: 124px"></span><small>30.07</small></div>
+                <div class="bar"><span style="height: 106px"></span><small>31.07</small></div>
+                <div class="bar"><span style="height: 138px"></span><small>01.08</small></div>
+                <div class="bar"><span style="height: 120px"></span><small>02.08</small></div>
+                <div class="bar"><span style="height: 98px"></span><small>03.08</small></div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <div class="panel-title">
+                  <h3>Dziennik pozycji</h3>
+                  <p class="muted-copy">Pozycje sa kartami w jednej warstwie, bez duzej sekcji czatu nad nimi.</p>
+                </div>
+                <div class="soft-btn">Wyczysc dzien</div>
+              </div>
+              <div class="entry-list">
+                <article class="entry-card">
+                  <div class="entry-top">
+                    <div>
+                      <h4>#1 Sniadanie</h4>
+                      <small>08:12</small>
+                    </div>
+                    <strong>540 kcal</strong>
+                  </div>
+                  <p class="entry-meta">W 48 g | T 18 g | B 32 g</p>
+                </article>
+                <article class="entry-card">
+                  <div class="entry-top">
+                    <div>
+                      <h4>#2 Obiad</h4>
+                      <small>14:04</small>
+                    </div>
+                    <strong>720 kcal</strong>
+                  </div>
+                  <p class="entry-meta">W 62 g | T 24 g | B 45 g</p>
+                </article>
+                <article class="entry-card">
+                  <div class="entry-top">
+                    <div>
+                      <h4>#3 Kolacja</h4>
+                      <small>19:20</small>
+                    </div>
+                    <strong>610 kcal</strong>
+                  </div>
+                  <p class="entry-meta">W 40 g | T 22 g | B 38 g</p>
+                </article>
+              </div>
+            </section>
+          </div>
+
+          <div class="stack">
+            <section class="panel">
+              <div class="panel-title">
+                <h3>Status i operacje</h3>
+                <p class="muted-copy">Niewielki feed systemowy, bez „rozmowy” jako glownej metafory.</p>
+              </div>
+              <div class="feed-list">
+                <article class="feed-card">
+                  <div class="feed-top">
+                    <strong>Zapisano kolacje</strong>
+                    <small>19:20</small>
+                  </div>
+                  <p>Bilans dnia zaktualizowany. Nadal jestes 525 kcal ponizej celu.</p>
+                </article>
+                <article class="feed-card">
+                  <div class="feed-top">
+                    <strong>Zmieniono profil</strong>
+                    <small>09:10</small>
+                  </div>
+                  <p>Cel wyliczony ponownie po aktualizacji wagi i aktywnosci.</p>
+                </article>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-title">
+                <h3>Wpis bezposredni</h3>
+                <p class="muted-copy">Formularz jest modulowy i zwarty. Nie spycha raportu poza ekran.</p>
+              </div>
+              <div class="template-tabs">
+                <div class="template-tab">Waga</div>
+                <div class="template-tab">Sniadanie</div>
+                <div class="template-tab active">Bilans dnia</div>
+              </div>
+              <pre class="template-preview">Bilans dnia
+Ilosc kalorii: 2150
+Weglowodany: 210
+Tluszcze: 70
+Bialko: 145</pre>
+              <div class="toolbar-row">
+                <div class="solid-btn">Zapisz bilans</div>
+                <div class="ghost-btn">Podglad wpisu</div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-title">
+                <h3>Ostatnie dni</h3>
+              </div>
+              <div class="day-list">
+                <div class="day-list-item"><small>28.07</small><strong>2140</strong></div>
+                <div class="day-list-item"><small>29.07</small><strong>2385</strong></div>
+                <div class="day-list-item"><small>30.07</small><strong>2510</strong></div>
+                <div class="day-list-item"><small>31.07</small><strong>2255</strong></div>
+                <div class="day-list-item"><small>01.08</small><strong>2620</strong></div>
+                <div class="day-list-item"><small>02.08</small><strong>2440</strong></div>
+                <div class="day-list-item"><small>03.08</small><strong>1875</strong></div>
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
