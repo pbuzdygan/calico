@@ -1,186 +1,188 @@
 # CALICO
 
-CALICO to prosty dziennik kalorii i makroskladnikow z interfejsem czatowym opartym o szablony wiadomosci. Aplikacja nie korzysta juz z AI ani parsera jezyka naturalnego.
+![Calico – Conscious habits. Real results.](branding/calico_banner.png)
+
+CALICO to prosty dziennik kalorii, makroskładników, wagi i obwodu pasa. Wpisy dodaje się przez formularz albo przez wklejenie tekstowego szablonu. Aplikacja nie korzysta z AI ani parsera języka naturalnego. Przeznaczona do użytku domowego w sieci LAN.
 
 ## Co robi aplikacja
 
-- prowadzi wpisy dzienne per user
-- zapisuje:
-  - `Waga`
-  - `Obwod pasa`
-  - `Sniadanie`
-  - `Obiad`
-  - `Kolacja`
-  - `Przekaska`
-  - `Bilans dnia`
-- liczy sume kcal i makr dla dnia
-- obsluguje raporty 5/7/30 dni oraz zakres i miesiac
-- ma PIN per user
-- ma tryb diagnostyczny `Admin`
+- prowadzi wpisy dzienne per użytkownik (PIN 4–8 cyfr),
+- zapisuje: `Waga`, `Obwód pasa`, `Śniadanie`, `Obiad`, `Kolacja`, `Przekąska`, `Bilans dnia`,
+- liczy sumę kcal i makro dnia oraz cel kcal (Mifflin-St Jeor × aktywność × korekta celu),
+- `Dziennik`: edycja, duplikowanie, przenoszenie i usuwanie pozycji, cofanie ostatniej zmiany, czyszczenie dnia,
+- `Raporty`: 7/30/90 dni, miesiąc, dowolny zakres — kalorie vs cel, bilans, najwyższy dzień, trend wagi (średnia 7-dniowa),
+- eksport wszystkich wpisów do CSV,
+- tryb diagnostyczny `Admin` (logi wiadomości tekstowych).
 
-## Najwazniejsze reguly
+## Interfejs
 
-- jesli nie podasz `Data:`, wpis trafia do dnia biezacego
-- akceptowane formaty dat:
-  - `YYYY-MM-DD`
-  - `DD.MM.YYYY`
-  - `DD-MM-YYYY`
-  - `DD/MM/YYYY`
-- `Waga` i `Obwod pasa`: jeden aktywny wpis na dzien, nowy wpis nadpisuje poprzedni
-- `Sniadanie`, `Obiad`, `Kolacja`, `Przekaska`: mozna dodawac wiele wpisow jednego dnia
-- kolejne wpisy tego samego typu dostaja etykiety typu:
-  - `Sniadanie`
-  - `Sniadanie Drugie`
-  - `Sniadanie Trzecie`
-- `Bilans dnia` jest jeden na dzien i zastępuje sume wszystkich posilkow z tego dnia
+Mobile-first, ciemny motyw zgodny z brandingiem (`docs/UI design.md`): granatowe karty, akcenty cyan/teal, pierścień postępu jako główny motyw.
 
-## Szablony wiadomosci
+- **Dziś** – pierścień kalorii (spożycie / cel), makroskładniki (udział w energii), „Dodaj posiłek”, karty wagi i obwodu pasa z mini-wykresami, regularność 7 dni („w celu” = ±10% celu kcal), cel kaloryczny i rekomendacja z oceny planu.
+- **Dziennik** – posiłki pogrupowane (Śniadanie, Obiad, Kolacja, Przekąski, Bilans dnia, Pomiary); dotknięcie pozycji otwiera akcje: edytuj, duplikuj, przenieś, usuń.
+- **Postępy** – 1M/3M/6M/1R/Wszystko/Własny: wykres wagi (z trendem 7 dni), obwodu, kalorii na tle celu, regularność tygodnia, historia dni.
+- **Cele** – aktualny plan, waga planu vs średnia, ocena planu i akceptacja sugestii.
+- **Więcej** – profil i plan, zmiana PIN-u, eksport CSV, panel administratora, konto.
 
-Waga:
+Nawigacja: dolny pasek na telefonie, boczny panel od 960 px. Dodawanie i edycja w dolnych panelach. Font Inter (OFL) jest dołączony lokalnie (`frontend/fonts/`) – aplikacja nie pobiera nic z internetu.
 
-```text
-Waga:
-Waga: 82.4 kg
+### PWA i ikony
+
+- `frontend/manifest.json`, `frontend/sw.js` (cache powłoki aplikacji; dane `/api` nigdy nie są cache'owane).
+- Ikony w `frontend/icons/` generuje skrypt z plików w `branding/`:
+
+```bash
+docker run --rm -v "$PWD:/repo" -w /repo python:3.12-slim \
+  sh -c "pip install -q pillow && python scripts/generate_icons.py"
 ```
 
-Obwod pasa:
+- Instalacja jako aplikacja (Android/Chrome, desktop) wymaga HTTPS albo `localhost` – przeglądarki nie uruchamiają service workera po zwykłym `http://` w sieci LAN. Na iOS „Dodaj do ekranu początkowego” działa także po HTTP (ikona `apple-touch-icon`).
+
+## Najważniejsze reguły
+
+- **Profil jest obowiązkowy i nie ma wartości domyślnych.** Nowy użytkownik (także „Domyślny Użytkownik” tworzony przy instalacji) po pierwszym odblokowaniu PIN-em musi uzupełnić profil: płeć, wiek, wzrost, aktualną wagę, aktywność, cel i korektę celu. Okna nie da się zamknąć ani pominąć, można jedynie zmienić użytkownika. Do tego czasu API danych zwraca `428`.
+
+- „Dzisiaj” liczone jest w strefie `APP_TIMEZONE` (domyślnie `Europe/Warsaw`).
+- Data wpisu: od `2000-01-01` do jutra włącznie.
+- `Waga`, `Obwód pasa`, `Bilans dnia`: jeden wpis na dzień, nowy nadpisuje poprzedni. Edycja/przeniesienie, które utworzyłoby drugi taki wpis, zwraca błąd 409.
+- Posiłki: dowolnie wiele w ciągu dnia, etykiety `Śniadanie`, `Śniadanie Drugie`, `Obiad Drugi`, `Kolacja Druga`…
+- `Bilans dnia` zastępuje sumę posiłków z tego dnia.
+- Cel kcal to **plan**, a nie wynik wzoru po każdym ważeniu. Zmienia się tylko jawnie:
+  - zapis profilu = nowy plan liczony wzorem z „wagi planu” (zapis ze zmienioną wagą tworzy też dzisiejszy wpis `Waga`),
+  - akceptacja sugestii z karty „Ocena planu” (zakładka `Użytkownik`).
+- Wpisy `Waga` służą do monitorowania: profil pokazuje aktualną wagę obok wagi planu, ale cel się nie zmienia.
+- Ocena planu (`app/plan.py`): trend masy z regresji pomiarów od startu planu (min. 4 pomiary z 14 dni), porównany z tempem wynikającym z planu. W zakresie → cel bez zmian, nawet jeśli szacowane TDEE spadło. Poza zakresem → przez pierwsze 21 dni „obserwuj”, potem sugestia korekty o 100–200 kcal (nie poniżej 1500 kcal dla mężczyzn / 1200 kcal dla kobiet). Gdy wpisy jedzenia pokrywają ≥ 70% dni, TDEE jest szacowane także z faktycznego spożycia i zmiany masy.
+- Zmiana celu aktualizuje cel dnia dzisiejszego i przyszłych; przeszłe dni zachowują swój cel.
+- Raporty liczą średnie i dni powyżej/poniżej celu tylko z dni, w których jest wpis jedzenia (posiłek lub bilans).
+- Zakresy wartości: kcal 0–10 000, makro 0–1 000 g, waga 30–300 kg, obwód 30–250 cm.
+
+## Szablony tekstowe (zakładka Dzień → „Wklej tekst”)
 
 ```text
-Obwod pasa:
-Obwod pasa: 91 cm
+Waga: 82,4 kg
 ```
-
-Sniadanie / Obiad / Kolacja / Przekaska:
 
 ```text
-Sniadanie
-Ilosc kalorii: 540
-Weglowodany: 48
-Tluszcze: 18
-Bialko: 32
+Obwód pasa: 91 cm
 ```
-
-Bilans dnia:
 
 ```text
-Bilans dnia
-Ilosc kalorii: 2150
-Weglowodany: 210
-Tluszcze: 70
-Bialko: 145
+Śniadanie
+Ilość kalorii: 540
+Węglowodany: 48
+Tłuszcze: 18
+Białko: 32
 ```
 
-Z data:
+Nagłówki: `Śniadanie`, `Obiad`, `Kolacja`, `Przekąska`, `Bilans dnia`. Polskie znaki są opcjonalne (`Sniadanie`, `Ilosc kalorii` też działa), liczby z przecinkiem lub kropką, jednostki opcjonalne.
+
+Inny dzień — pierwsza linia `Data:` (`RRRR-MM-DD`, `DD.MM.RRRR`, `DD-MM-RRRR`, `DD/MM/RRRR`):
 
 ```text
 Data: 2026-08-03
 Kolacja
-Ilosc kalorii: 610
-Weglowodany: 40
-Tluszcze: 22
-Bialko: 38
+Ilość kalorii: 610
+Węglowodany: 40
+Tłuszcze: 22
+Białko: 38
 ```
+
+Komendy tekstowe (cała wiadomość): `pokaż dziś`, `cofnij ostatni`, `usuń 2`, `pomoc`.
 
 ## Start
 
-1. Skopiuj konfiguracje:
-
 ```bash
 cp .env.example .env
-```
-
-2. Uruchom:
-
-```bash
 docker compose up --build -d
 ```
 
-3. Otworz:
+Otwórz `http://localhost:8080`. Przy pierwszym starcie: użytkownik `Domyślny Użytkownik`, PIN z `DEFAULT_USER_PIN` (domyślnie `1234`). Po odblokowaniu aplikacja wymusi uzupełnienie profilu. PIN zmień w zakładce `Użytkownik`.
 
-```text
-http://localhost:8080
+Aplikacja działa w jednym kontenerze: FastAPI serwuje API i pliki frontendu. Dane są w wolumenie `calico_data` (`/data/calico.db`).
+
+Aktualizacja z wersji z Caddy (dwa kontenery `backend` + `proxy`):
+
+```bash
+docker compose up --build -d --remove-orphans
 ```
 
-4. Przy pierwszym starcie:
+Wolumen z danymi zostaje ten sam. Przy pierwszym starcie baza jest migrowana automatycznie (wersja schematu w tabeli `app_meta`, klucz `schema_version`).
 
-- domyslny user: `Domyslny Uzytkownik`
-- domyslny PIN: z `DEFAULT_USER_PIN` (domyslnie `1234`)
+## Konfiguracja (`.env`)
 
-## UI
+| Zmienna | Domyślnie | Opis |
+|---|---|---|
+| `APP_TIMEZONE` | `Europe/Warsaw` | strefa, w której liczony jest „dzisiejszy” dzień |
+| `SQLITE_PATH` | `/data/calico.db` | ścieżka bazy |
+| `CORS_ORIGIN` | pusty | pusty = brak CORS (frontend i API na tym samym adresie) |
+| `DEFAULT_USER_PIN` | `1234` | PIN użytkownika tworzonego przy pierwszym starcie |
+| `ADMIN_PIN` | pusty | ustawienie włącza tryb `Admin` i logi diagnostyczne |
+| `DIAGNOSTICS_PATH` | `/data/diagnostics` | katalog logów JSONL |
 
-Glowne sekcje:
+## API
 
-- `Czat`
-- `Dziennik`
-- `Raporty`
-- `Uzytkownik`
-- `Admin`
+Wszystkie endpointy danych wymagają nagłówka `X-User-PIN` i parametru `user_id` (query albo ścieżka). Błędy: `401` zły PIN, `404` brak obiektu, `409` konflikt (np. drugi wpis `Waga` w dniu), `422` niepoprawne dane, `428` profil nieuzupełniony (dotyczy dni, wpisów, raportów, planu, eksportu i czatu).
 
-W czacie sa gotowe przyciski szablonow. Klikniecie wstawia wzor do edycji. Nie trzeba wpisywac komend naturalnym jezykiem.
+Użytkownicy i profil:
 
-## Dziennik i raporty
+- `GET /api/users`, `POST /api/users`, `DELETE /api/users/{user_id}`
+- `POST /api/users/{user_id}/pin` — `{"new_pin": "5678"}`
+- `POST /api/auth/verify`
+- `GET|PUT /api/profile/{user_id}` — `is_complete=false` i puste pola, dopóki profil nie zostanie zapisany; `PUT` wymaga wszystkich pól. `weight_kg` to waga planu, `current_weight_kg` to ostatni pomiar
+- `POST /api/profile/{user_id}/preview` — podgląd BMR/TDEE/celu dla danych z formularza (bez zapisu, działa przed uzupełnieniem profilu)
+- `GET /api/profile/{user_id}/plan` — ocena planu (status, trend, TDEE, sugestia)
+- `POST /api/profile/{user_id}/plan/apply` — `{"target_kcal": 2460}` akceptuje bieżącą sugestię (409, jeśli się zmieniła)
 
-API:
+Dni i wpisy (odczyt nigdy nie tworzy dnia w bazie):
 
 - `GET /api/days/current?user_id=`
-- `GET /api/days?user_id=&limit=`
-- `GET /api/days/{log_date}?user_id=`
-- `PATCH /api/days/{log_date}/entries/{entry_id}?user_id=`
-- `DELETE /api/days/{log_date}/entries/{entry_id}?user_id=`
-- `POST /api/days/{log_date}/clear?user_id=`
-- `POST /api/days/{log_date}/close?user_id=`
-- `POST /api/days/{log_date}/reopen?user_id=`
+- `GET /api/days?user_id=&limit=` — tylko dni z wpisami
+- `GET /api/days/{date}?user_id=`
+- `POST /api/days/{date}/entries?user_id=` — `{"entry_type": "lunch", "kcal": 600, "carbs_g": 60, "fat_g": 20, "protein_g": 40}` lub `{"entry_type": "weight", "weight_kg": 82.4}`
+- `PATCH /api/days/{date}/entries/{id}?user_id=` — `{"entry": {...}}` albo `{"source_text": "..."}`
+- `POST /api/days/{date}/entries/{id}/move?user_id=` — `{"target_date": "2026-06-14"}`
+- `POST /api/days/{date}/entries/{id}/duplicate?user_id=` — `{"target_date": null}` (null = ten sam dzień)
+- `DELETE /api/days/{date}/entries/{id}?user_id=`
+- `POST /api/days/{date}/undo?user_id=` — usuwa ostatnio dodaną/zmienioną pozycję dnia
+- `POST /api/days/{date}/clear?user_id=`
 
-Raporty:
+Raporty i eksport:
 
 - `GET /api/reports/summary?user_id=&days=7`
-- `GET /api/reports/range?user_id=&date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`
-- `GET /api/reports/month?user_id=&month=YYYY-MM`
+- `GET /api/reports/range?user_id=&date_from=&date_to=` (maks. 3660 dni)
+- `GET /api/reports/month?user_id=&month=RRRR-MM`
+- `GET /api/export?user_id=` — CSV
 
-## PIN auth
+Czat tekstowy: `POST /api/chat/message` — odpowiedź ma pole `kind`: `saved`, `info` albo `error`.
 
-- kazdy user ma osobny PIN 4-8 cyfr
-- PIN jest haszowany po stronie backendu
-- po wpisaniu PIN-u mozna nacisnac `Enter`
-- user moze usunac swoje konto z sekcji `Uzytkownik`
+Pozostałe: `GET /health`, `GET /api/meta` (dzisiejsza data serwera i strefa), `/api/admin/*`.
 
-## Profil i cel kcal
+## Testy
 
-Profil sluzy do wyliczenia celu kcal wzorem Mifflin-St Jeor z aktywnoscia i celem:
-
-- `maintain`: 0%
-- `cut`: zwykle 10-20%
-- `bulk`: zwykle 5-15%
-
-Wpisy `Waga` z czatu sa historia pomiarow dnia. Profil nadal ma osobna wartosc `Waga kg` do celu kalorycznego.
+```bash
+cd backend
+docker run --rm -v "$PWD:/app" -w /app -e PYTHONPATH=/app python:3.12-slim \
+  sh -c "pip install -q -r requirements.txt -r requirements-dev.txt && pytest -q -p no:cacheprovider"
+```
 
 ## Diagnostyka i Admin
 
-- jesli ustawisz `ADMIN_PIN` w `.env`, aplikacja wlacza tryb `Admin`
-- kazda interakcja z czatem zapisuje sie do JSONL per user w `DIAGNOSTICS_PATH`
-- przy usunieciu usera usuwane sa jego logi diagnostyczne
+- Ustawienie `ADMIN_PIN` włącza zakładkę `Admin`.
+- Każda wiadomość tekstowa (zakładka Dzień → „Wklej tekst”) trafia do pliku JSONL per użytkownik w `DIAGNOSTICS_PATH`, z wynikiem `success` albo `error`.
+- Admin widzi pełną treść tych wiadomości (dane o diecie i wadze) — włączaj tylko, gdy jest potrzebny.
+- Usunięcie użytkownika usuwa też jego logi.
 
-## Security baseline
+## Bezpieczeństwo
 
-- brak kluczy AI i brak integracji z zewnetrznym LLM
-- SQLite w trybie `WAL`
-- `busy_timeout`
-- `foreign_keys=ON`
-- sekrety poza repo (`.env` w `.gitignore`)
+- Aplikacja jest przeznaczona do sieci domowej. Nie wystawiaj jej do internetu bez reverse proxy z TLS i dodatkowego uwierzytelnienia.
+- PIN haszowany PBKDF2-SHA256 (120 tys. iteracji), porównanie PIN-u admina w czasie stałym.
+- Nagłówki `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`.
+- SQLite w trybie `WAL`, `foreign_keys=ON`; sekrety poza repo (`.env` w `.gitignore`).
 
-## Troubleshooting
+## Dokumentacja projektu
 
-Po zmianach backendu i frontendu wykonaj pelny restart:
-
-```bash
-docker compose down
-docker compose up --build -d
-```
-
-Jesli frontend nie odpowiada poprawnie:
-
-```bash
-docker compose logs proxy --tail=100
-docker compose logs backend --tail=100
-docker compose ps
-```
+- `docs/review-2026-09-30.md` — przegląd, decyzje produktowe i backlog (źródło prawdy dla dalszych prac),
+- `AGENTS.md` — instrukcje dla agentów AI,
+- `docs/ui-expansion-plan.md` — plan historyczny,
+- `docs/UI design.md` — system wizualny i zasady UI (źródło prawdy dla wyglądu),
+- `docs/mockups/` — wcześniejsze mockupy UI (historyczne).

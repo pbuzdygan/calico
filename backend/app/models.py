@@ -3,6 +3,7 @@ from datetime import date, datetime
 from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from .clock import utcnow_naive
 from .db import Base
 
 
@@ -21,7 +22,7 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(128))
     pin_hash: Mapped[str] = mapped_column(String(256))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
 
     profile: Mapped["Profile"] = relationship(
         back_populates="user",
@@ -49,8 +50,13 @@ class Profile(Base):
     activity_level: Mapped[str] = mapped_column(String(32), default="moderate")
     goal_type: Mapped[str] = mapped_column(String(16), default="maintain")
     goal_delta_pct: Mapped[float] = mapped_column(Float, default=0.0)
+    # weight_kg = waga planu (startowa); aktualna waga wynika z wpisow 'Waga'.
     daily_kcal_target: Mapped[float] = mapped_column(Float, default=2400)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    plan_tdee_kcal: Mapped[float | None] = mapped_column(Float, nullable=True)
+    plan_started_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Profil jest kompletny dopiero po pierwszym jawnym zapisie przez uzytkownika (brak danych domyslnych).
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
     user: Mapped["User"] = relationship(back_populates="profile", passive_deletes=True)
 
@@ -61,19 +67,21 @@ class DayLog(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    log_date: Mapped[date] = mapped_column(Date, index=True, default=date.today)
-    status: Mapped[str] = mapped_column(String(16), default="open")
+    log_date: Mapped[date] = mapped_column(Date, index=True)
     daily_kcal_target_snapshot: Mapped[float] = mapped_column(Float, default=0.0)
     total_kcal: Mapped[float] = mapped_column(Float, default=0.0)
     total_carbs_g: Mapped[float] = mapped_column(Float, default=0.0)
     total_fat_g: Mapped[float] = mapped_column(Float, default=0.0)
     total_protein_g: Mapped[float] = mapped_column(Float, default=0.0)
     balance_mode: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
 
     user: Mapped["User"] = relationship(back_populates="day_logs", passive_deletes=True)
-    entries: Mapped[list["DayEntry"]] = relationship(back_populates="day_log", cascade="all,delete-orphan")
+    entries: Mapped[list["DayEntry"]] = relationship(
+        back_populates="day_log",
+        cascade="all,delete-orphan",
+        order_by="(DayEntry.entry_order, DayEntry.id)",
+    )
 
 
 class DayEntry(Base):
@@ -91,7 +99,7 @@ class DayEntry(Base):
     protein_g: Mapped[float | None] = mapped_column(Float, nullable=True)
     weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
     waist_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
     day_log: Mapped["DayLog"] = relationship(back_populates="entries")

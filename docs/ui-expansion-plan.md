@@ -1,5 +1,9 @@
 # CALICO: plan rozbudowy `Dziennik` + `Raporty` + odswiezenie UI
 
+> **Dokument historyczny (D7, 2026-09-30).** Plan pochodzi z czasow parsera AI i jest czesciowo nieaktualny
+> (np. `meals`, "wpisy 0 kcal", "ustawienia parsera", status dnia). Aktualny stan, decyzje i backlog:
+> [`docs/review-2026-09-30.md`](review-2026-09-30.md).
+
 ## Cel
 
 Rozszerzyc obecne MVP o dwie brakujace warstwy:

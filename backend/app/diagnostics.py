@@ -1,9 +1,9 @@
 import json
-from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from . import clock
 from .config import settings
 from .models import User
 
@@ -33,7 +33,7 @@ def log_chat_interaction(
         return
 
     payload = {
-        "timestamp": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "timestamp": clock.now_utc().isoformat(timespec="seconds").replace("+00:00", "Z"),
         "user_id": user.id,
         "user_slug": user.slug,
         "display_name": user.display_name,

@@ -2,292 +2,649 @@
 <html lang="pl">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CALICO</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Calico</title>
+    <meta name="description" content="Calico – świadome nawyki, realne efekty. Dziennik kalorii, makroskładników, wagi i obwodu pasa." />
+    <meta name="theme-color" content="#061426" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Calico" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" href="/icons/favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/inter-latin-ext.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="app-shell">
-      <header class="topbar">
-        <div class="brand">
-          <div class="brand-mark">C</div>
-          <div>
-            <p class="brand-eyebrow">CALICO</p>
-            <h1>Calorie Console</h1>
+    <!-- Ikony: cienki kontur, 24x24, kolor z currentColor -->
+    <svg class="sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-today" viewBox="0 0 24 24"><path d="M3.5 15a8.5 8.5 0 1 1 17 0" /><path d="M12 15l4-5" /><circle cx="12" cy="15" r="1.3" /></symbol>
+      <symbol id="i-log" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11" /><circle cx="4.5" cy="6" r="1" /><circle cx="4.5" cy="12" r="1" /><circle cx="4.5" cy="18" r="1" /></symbol>
+      <symbol id="i-progress" viewBox="0 0 24 24"><path d="M3.5 3.5v17h17" /><path d="M7.5 15l4-4.5 3 3 5.5-6.5" /></symbol>
+      <symbol id="i-goals" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.8" /><circle cx="12" cy="12" r="1.2" /></symbol>
+      <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.2" /><circle cx="12" cy="12" r="1.2" /><circle cx="18.5" cy="12" r="1.2" /></symbol>
+      <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3c.9 3.4 5 5.6 5 10.2a5 5 0 0 1-10 0c0-2.2 1-3.9 2.6-5.1.3 1.6 1.1 2.6 2.4 3C12.6 9 11.2 6.2 12 3z" /></symbol>
+      <symbol id="i-scale" viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="16" rx="4" /><path d="M8.5 10.5a4.8 4.8 0 0 1 7 0" /><path d="M12 10.5l1.4-2" /></symbol>
+      <symbol id="i-ruler" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="2" /><path d="M7 8v3M11 8v4M15 8v3M19 8v2" /></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3" /><path d="M8 3v4M16 3v4M3.5 10h17" /></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></symbol>
+      <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9.5 5.5L16 12l-6.5 6.5" /></symbol>
+      <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M14.5 5.5L8 12l6.5 6.5" /></symbol>
+      <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M5.5 9.5L12 16l6.5-6.5" /></symbol>
+      <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M13.5 6.5l4 4" /></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.5" /><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5" /></symbol>
+      <symbol id="i-move" viewBox="0 0 24 24"><path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5" /></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></symbol>
+      <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5" /><path d="M4 9h10a6 6 0 0 1 0 12h-3" /></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></symbol>
+      <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" /></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></symbol>
+      <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4" /><path d="M11 12l8.5-8.5M16 7l3 3" /></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7.5 3v6c0 4.8-3.3 7.9-7.5 9-4.2-1.1-7.5-4.2-7.5-9V6z" /></symbol>
+      <symbol id="i-logout" viewBox="0 0 24 24"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" /><path d="M9 16l-4-4 4-4M5 12h11" /></symbol>
+      <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></symbol>
+      <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h9" /></symbol>
+      <symbol id="i-trending" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></symbol>
+    </svg>
+
+    <!-- EKRAN BLOKADY -->
+    <section id="lockScreen" class="lock-screen" aria-labelledby="lockTitle">
+      <div class="lock-card">
+        <img class="lock-logo" src="/icons/logo-256.png" width="112" height="112" alt="" />
+        <h1 id="lockTitle" class="wordmark">CALIC<span class="wordmark-o" aria-hidden="true"></span><span class="visually-hidden">O</span></h1>
+        <p class="tagline">Świadome nawyki. Realne efekty.</p>
+        <form id="unlockForm" class="lock-form">
+          <div class="field">
+            <label for="userSelect">Użytkownik</label>
+            <select id="userSelect"></select>
           </div>
+          <div class="field">
+            <label for="pinInput">PIN</label>
+            <input id="pinInput" class="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="••••" autocomplete="current-password" />
+          </div>
+          <button id="unlockBtn" class="btn btn-primary" type="submit">Odblokuj</button>
+          <p id="authStatus" class="form-status" aria-live="polite"></p>
+        </form>
+        <div class="lock-links">
+          <button id="newUserBtn" class="btn btn-quiet" type="button"><svg class="icon"><use href="#i-user" /></svg>Nowy użytkownik</button>
+          <button id="lockAdminBtn" class="btn btn-quiet" type="button"><svg class="icon"><use href="#i-shield" /></svg>Administrator</button>
         </div>
+      </div>
+    </section>
 
-        <nav class="tabs" aria-label="Sekcje aplikacji">
-          <button class="tab-btn active" data-tab="chatPanel">Dzien</button>
-          <button class="tab-btn" data-tab="journalPanel">Dziennik</button>
-          <button class="tab-btn" data-tab="reportsPanel">Raporty</button>
-          <button class="tab-btn" data-tab="userPanel">Uzytkownik</button>
-          <button class="tab-btn" data-tab="adminPanel">Admin</button>
-        </nav>
+    <!-- APLIKACJA -->
+    <div id="app" class="app-shell" hidden>
+      <nav class="app-nav" aria-label="Nawigacja główna">
+        <div class="nav-brand">
+          <img src="/icons/logo-64.png" width="32" height="32" alt="" />
+          <span>Calico</span>
+        </div>
+        <a class="nav-item" href="#/today" data-view="today"><svg class="icon"><use href="#i-today" /></svg><span>Dziś</span></a>
+        <a class="nav-item" href="#/log" data-view="log"><svg class="icon"><use href="#i-log" /></svg><span>Dziennik</span></a>
+        <a class="nav-item" href="#/progress" data-view="progress"><svg class="icon"><use href="#i-progress" /></svg><span>Postępy</span></a>
+        <a class="nav-item" href="#/goals" data-view="goals"><svg class="icon"><use href="#i-goals" /></svg><span>Cele</span></a>
+        <a class="nav-item" href="#/more" data-view="more"><svg class="icon"><use href="#i-more" /></svg><span>Więcej</span></a>
+      </nav>
 
-        <div class="auth-strip">
-          <div class="auth-field auth-compact">
-            <label for="userSelect">Uzytkownik</label>
-            <div class="auth-inline">
-              <select id="userSelect"></select>
-              <button id="newUserBtn" class="ghost" type="button">Nowy</button>
-              <button id="unlockToggleBtn" type="button">Odblokuj</button>
+      <main class="app-main">
+        <!-- DZIŚ -->
+        <section id="view-today" class="view" aria-labelledby="todayTitle">
+          <header class="screen-header">
+            <div>
+              <h1 id="todayTitle">Dziś</h1>
+              <p id="todayDate" class="screen-sub"></p>
             </div>
-            <div id="pinPopover" class="pin-popover is-hidden">
-              <label for="pinInput">PIN</label>
-              <div class="pin-row">
-                <input id="pinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="4-8 cyfr" />
-                <button id="unlockBtn" type="button">Potwierdz</button>
+            <a class="icon-btn" href="#/log" aria-label="Dziennik – wybierz dzień"><svg class="icon"><use href="#i-calendar" /></svg></a>
+          </header>
+
+          <div class="today-grid">
+            <div class="today-main">
+              <article class="card hero-card" aria-labelledby="heroTitle">
+                <div class="card-head">
+                  <h2 id="heroTitle" class="card-title"><svg class="icon icon-accent"><use href="#i-flame" /></svg>Kalorie</h2>
+                  <span class="chip">Dziś</span>
+                </div>
+                <div class="ring-wrap">
+                  <svg id="calorieRing" class="ring" viewBox="0 0 200 200" role="img" aria-label="">
+                    <defs>
+                      <linearGradient id="ringGradient" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#1AA8FF" />
+                        <stop offset="48%" stop-color="#20D5FF" />
+                        <stop offset="100%" stop-color="#32E6C4" />
+                      </linearGradient>
+                    </defs>
+                    <circle class="ring-track" cx="100" cy="100" r="84" />
+                    <circle id="ringProgress" class="ring-progress" cx="100" cy="100" r="84" />
+                  </svg>
+                  <div class="ring-center">
+                    <strong id="ringConsumed" class="ring-value">0</strong>
+                    <span id="ringTarget" class="ring-target">/ – kcal</span>
+                  </div>
+                </div>
+                <p id="ringStatus" class="ring-status"></p>
+                <div class="macro-list" id="macroList"></div>
+                <p id="balanceNote" class="note" hidden><svg class="icon"><use href="#i-info" /></svg>Aktywny Bilans dnia – zastępuje sumę posiłków.</p>
+              </article>
+
+              <button id="addFoodBtn" class="btn btn-cta" type="button"><svg class="icon"><use href="#i-plus" /></svg>Dodaj posiłek</button>
+              <button id="quickTextBtn" class="btn btn-quiet btn-block" type="button"><svg class="icon"><use href="#i-text" /></svg>Szybki wpis tekstowy</button>
+            </div>
+
+            <div class="today-side">
+              <div class="metric-row">
+                <button id="weightCard" class="card metric-card" type="button" data-measure="weight">
+                  <span class="card-head"><span class="card-title"><svg class="icon icon-blue"><use href="#i-scale" /></svg>Waga</span><svg class="icon chevron"><use href="#i-plus" /></svg></span>
+                  <span class="metric-value" id="weightValue">–</span>
+                  <span class="delta" id="weightDelta"></span>
+                  <span class="sparkline" id="weightSpark"></span>
+                </button>
+                <button id="waistCard" class="card metric-card" type="button" data-measure="waist">
+                  <span class="card-head"><span class="card-title"><svg class="icon icon-teal"><use href="#i-ruler" /></svg>Obwód pasa</span><svg class="icon chevron"><use href="#i-plus" /></svg></span>
+                  <span class="metric-value" id="waistValue">–</span>
+                  <span class="delta" id="waistDelta"></span>
+                  <span class="sparkline" id="waistSpark"></span>
+                </button>
               </div>
+
+              <a class="card metric-card adherence-card" href="#/progress">
+                <span class="card-head"><span class="card-title"><svg class="icon icon-teal"><use href="#i-check" /></svg>Cele i regularność</span><svg class="icon chevron"><use href="#i-chevron-right" /></svg></span>
+                <span class="metric-value" id="adherenceValue">–</span>
+                <span id="adherenceDots" class="day-dots"></span>
+                <span id="adherenceSub" class="card-sub"></span>
+              </a>
+
+              <a class="card info-card" href="#/goals">
+                <span class="card-head"><span class="card-title"><svg class="icon icon-accent"><use href="#i-goals" /></svg>Cel kaloryczny</span><svg class="icon chevron"><use href="#i-chevron-right" /></svg></span>
+                <span class="metric-value" id="targetValue">–</span>
+                <span class="kv-list">
+                  <span class="kv"><span>Cel</span><strong id="targetGoal">–</strong></span>
+                  <span class="kv"><span>Oczekiwane tempo</span><strong id="targetPace">–</strong></span>
+                </span>
+                <span class="card-link">Oceń plan<svg class="icon"><use href="#i-chevron-right" /></svg></span>
+              </a>
+
+              <a id="recommendationCard" class="card info-card recommendation-card" href="#/goals" hidden>
+                <span class="card-head"><span class="card-title"><svg class="icon icon-accent"><use href="#i-info" /></svg>Przegląd celu kalorycznego</span></span>
+                <span id="recommendationText" class="card-text"></span>
+                <span class="card-link">Zobacz rekomendację<svg class="icon"><use href="#i-chevron-right" /></svg></span>
+              </a>
             </div>
           </div>
-          <p id="authStatus" class="auth-status">Wymagane odblokowanie PIN.</p>
-        </div>
-      </header>
+        </section>
 
-      <main class="workspace">
-        <section class="main-column">
-          <section id="chatPanel" class="panel tab-panel active user-protected-panel">
-            <div class="lockable-body">
-              <div class="operator-layout">
-                <div class="operator-side">
-                  <section class="operator-entry">
-                    <div class="section-head">
-                      <h3>Szybki wpis</h3>
-                      <p class="muted">Wybierasz typ wpisu i od razu edytujesz gotowy szablon.</p>
-                    </div>
-
-                    <div class="template-actions template-actions-stack">
-                      <button class="ghost template-btn" type="button" data-template="weight">Waga</button>
-                      <button class="ghost template-btn" type="button" data-template="waist">Obwod pasa</button>
-                      <button class="ghost template-btn" type="button" data-template="breakfast">Sniadanie</button>
-                      <button class="ghost template-btn" type="button" data-template="lunch">Obiad</button>
-                      <button class="ghost template-btn" type="button" data-template="dinner">Kolacja</button>
-                      <button class="ghost template-btn" type="button" data-template="snack">Przekaska</button>
-                      <button class="ghost template-btn" type="button" data-template="daily_balance">Bilans dnia</button>
-                    </div>
-
-                    <div class="template-guide">
-                      <strong>Zasada daty</strong>
-                      <p class="muted">
-                        Dodaj na gorze <code>Data: YYYY-MM-DD</code>, <code>DD.MM.YYYY</code>, <code>DD-MM-YYYY</code> albo <code>DD/MM/YYYY</code>, jezeli wpis ma trafic do innego dnia.
-                      </p>
-                    </div>
-
-                    <div id="entryFeedback" class="entry-feedback is-hidden" aria-live="polite"></div>
-
-                    <form id="chatForm" class="composer operator-composer">
-                      <textarea id="messageInput" rows="10" spellcheck="false"></textarea>
-                      <div class="operator-actions inline-actions">
-                        <button type="submit">Zapisz wpis</button>
-                        <button id="clearDraftBtn" class="ghost" type="button">Wyczysc</button>
-                      </div>
-                    </form>
-                  </section>
-                </div>
-              </div>
+        <!-- DZIENNIK -->
+        <section id="view-log" class="view" aria-labelledby="logTitle" hidden>
+          <header class="screen-header">
+            <div>
+              <h1 id="logTitle">Dziennik</h1>
+              <p id="logSummary" class="screen-sub"></p>
             </div>
-            <div class="panel-lock">
-              <h3>Panel zablokowany</h3>
-              <p class="lock-copy">Wybierz uzytkownika i podaj jego PIN, aby zobaczyc dane dnia, wpisy i status operacji.</p>
+          </header>
+          <div class="date-nav">
+            <button id="logPrevBtn" class="icon-btn" type="button" aria-label="Poprzedni dzień"><svg class="icon"><use href="#i-chevron-left" /></svg></button>
+            <label class="date-pill">
+              <svg class="icon"><use href="#i-calendar" /></svg>
+              <span id="logDateLabel"></span>
+              <input id="logDate" type="date" aria-label="Wybierz dzień" />
+            </label>
+            <button id="logNextBtn" class="icon-btn" type="button" aria-label="Następny dzień"><svg class="icon"><use href="#i-chevron-right" /></svg></button>
+            <button id="logTodayBtn" class="chip chip-btn" type="button">Dziś</button>
+          </div>
+          <div id="logGroups" class="log-groups"></div>
+          <div class="log-actions">
+            <button id="logUndoBtn" class="btn btn-quiet" type="button"><svg class="icon"><use href="#i-undo" /></svg>Cofnij ostatni</button>
+            <button id="logClearBtn" class="btn btn-quiet btn-danger-text" type="button"><svg class="icon"><use href="#i-trash" /></svg>Wyczyść dzień</button>
+          </div>
+          <button id="logFab" class="fab" type="button" aria-label="Dodaj wpis w tym dniu"><svg class="icon"><use href="#i-plus" /></svg></button>
+        </section>
+
+        <!-- POSTĘPY -->
+        <section id="view-progress" class="view" aria-labelledby="progressTitle" hidden>
+          <header class="screen-header">
+            <div>
+              <h1 id="progressTitle">Postępy</h1>
+              <p id="progressRangeLabel" class="screen-sub"></p>
             </div>
-          </section>
+          </header>
+          <div class="segmented range-chips" role="group" aria-label="Zakres">
+            <button class="seg" type="button" data-range="30">1M</button>
+            <button class="seg" type="button" data-range="90">3M</button>
+            <button class="seg" type="button" data-range="182">6M</button>
+            <button class="seg" type="button" data-range="365">1R</button>
+            <button class="seg" type="button" data-range="all">Wszystko</button>
+            <button class="seg" type="button" data-range="custom">Własny</button>
+          </div>
+          <div class="progress-grid">
+            <article class="card chart-card">
+              <div class="card-head"><h2 class="card-title"><svg class="icon icon-blue"><use href="#i-scale" /></svg>Waga</h2></div>
+              <div class="metric-line"><strong id="pWeightValue" class="metric-value">–</strong><span id="pWeightDelta" class="delta"></span></div>
+              <div id="pWeightChart" class="chart-area"></div>
+            </article>
+            <article class="card chart-card">
+              <div class="card-head"><h2 class="card-title"><svg class="icon icon-teal"><use href="#i-ruler" /></svg>Obwód pasa</h2></div>
+              <div class="metric-line"><strong id="pWaistValue" class="metric-value">–</strong><span id="pWaistDelta" class="delta"></span></div>
+              <div id="pWaistChart" class="chart-area"></div>
+            </article>
+            <article class="card chart-card">
+              <div class="card-head"><h2 class="card-title"><svg class="icon icon-accent"><use href="#i-flame" /></svg>Kalorie i cel</h2></div>
+              <div class="stat-row">
+                <div class="stat"><span>Średnie spożycie</span><strong id="pAvgKcal">–</strong></div>
+                <div class="stat"><span>Średni cel</span><strong id="pAvgTarget">–</strong></div>
+                <div class="stat"><span>Dni w celu</span><strong id="pAdherence">–</strong></div>
+              </div>
+              <div id="pKcalChart" class="chart-area bars"></div>
+              <p id="pKcalNote" class="card-sub"></p>
+            </article>
+            <article class="card chart-card">
+              <div class="card-head"><h2 class="card-title"><svg class="icon icon-teal"><use href="#i-check" /></svg>Regularność – ostatnie 7 dni</h2></div>
+              <div id="pWeekDots" class="day-dots day-dots-labeled"></div>
+              <p id="pWeekSub" class="card-sub"></p>
+            </article>
+            <article class="card chart-card progress-history">
+              <div class="card-head"><h2 class="card-title"><svg class="icon"><use href="#i-log" /></svg>Historia dni</h2></div>
+              <div id="pHistory" class="row-list"></div>
+            </article>
+          </div>
+        </section>
 
-          <section id="journalPanel" class="panel tab-panel user-protected-panel">
-            <div class="lockable-body">
-              <div class="panel-head">
-                <h2>Dziennik</h2>
-                <div class="toolbar-row">
-                  <label class="compact-label" for="daySelect">Dzien</label>
-                  <select id="daySelect"></select>
-                  <button id="refreshDayBtn" class="ghost" type="button">Odswiez</button>
-                </div>
-              </div>
-              <div class="toolbar-row wrap">
-                <button id="showBtn" class="ghost" type="button">Pokaz dzis</button>
-                <button id="undoBtn" class="ghost" type="button">Cofnij ostatni</button>
-                <button id="closeBtn" class="ghost" type="button">Podsumuj dzien</button>
-                <button id="clearDayBtn" class="ghost danger" type="button">Wyczysc dzien</button>
-              </div>
-              <div id="journalMeta" class="meta-line">Brak danych dnia.</div>
-              <div id="journalMeals" class="meal-list"></div>
+        <!-- CELE -->
+        <section id="view-goals" class="view" aria-labelledby="goalsTitle" hidden>
+          <header class="screen-header">
+            <div>
+              <h1 id="goalsTitle">Cele</h1>
+              <p class="screen-sub">Plan kaloryczny i jego ocena na podstawie trendu masy.</p>
             </div>
-            <div class="panel-lock">
-              <h3>Dziennik zablokowany</h3>
-              <p class="lock-copy">Podaj PIN wybranego uzytkownika, aby przegladac i edytowac jego wpisy.</p>
+          </header>
+          <div class="goals-grid">
+            <article class="card">
+              <div class="card-head"><h2 class="card-title"><svg class="icon icon-accent"><use href="#i-goals" /></svg>Obecny cel</h2><span id="goalTypeChip" class="chip"></span></div>
+              <div class="metric-line"><strong id="goalTarget" class="metric-value metric-xl">–</strong></div>
+              <div class="kv-list">
+                <div class="kv"><span>Oczekiwane tempo</span><strong id="goalPace">–</strong></div>
+                <div class="kv"><span>Zapotrzebowanie na starcie planu</span><strong id="goalPlanTdee">–</strong></div>
+                <div class="kv"><span>Plan od</span><strong id="goalPlanSince">–</strong></div>
+              </div>
+            </article>
+            <article class="card">
+              <div class="card-head"><h2 class="card-title"><svg class="icon icon-blue"><use href="#i-scale" /></svg>Waga</h2></div>
+              <div class="kv-list">
+                <div class="kv"><span>Waga planu (start)</span><strong id="goalStartWeight">–</strong></div>
+                <div class="kv"><span>Aktualna (średnia 7 dni)</span><strong id="goalTrendWeight">–</strong></div>
+                <div class="kv"><span>Zmiana od startu planu</span><strong id="goalWeightChange">–</strong></div>
+                <div class="kv"><span>Tempo zmiany masy</span><strong id="goalObservedRate">–</strong></div>
+              </div>
+            </article>
+            <article class="card plan-card">
+              <div class="card-head">
+                <h2 class="card-title"><svg class="icon icon-teal"><use href="#i-trending" /></svg>Ocena planu</h2>
+                <span id="planStatusBadge" class="chip"></span>
+              </div>
+              <p class="card-sub">Cel zmienia się tylko po Twojej akceptacji – na podstawie trendu masy, nie pojedynczego ważenia.</p>
+              <p id="planMessage" class="card-text"></p>
+              <div id="planMetrics" class="stat-grid"></div>
+              <ul id="planNotes" class="notes"></ul>
+              <div class="button-row">
+                <button id="planApplyBtn" class="btn btn-primary" type="button" hidden>Zastosuj sugestię</button>
+                <button id="planRefreshBtn" class="btn btn-quiet" type="button">Odśwież ocenę</button>
+              </div>
+            </article>
+            <a class="card info-card" href="#/more">
+              <span class="card-head"><span class="card-title"><svg class="icon"><use href="#i-edit" /></svg>Zmień profil lub cel</span><svg class="icon chevron"><use href="#i-chevron-right" /></svg></span>
+              <span class="card-sub">Zapis profilu tworzy nowy plan liczony wzorem z podanej wagi.</span>
+            </a>
+          </div>
+        </section>
+
+        <!-- WIĘCEJ -->
+        <section id="view-more" class="view" aria-labelledby="moreTitle" hidden>
+          <header class="screen-header">
+            <div>
+              <h1 id="moreTitle">Więcej</h1>
+              <p id="moreUser" class="screen-sub"></p>
             </div>
-          </section>
-
-          <section id="reportsPanel" class="panel tab-panel user-protected-panel">
-            <div class="lockable-body">
-              <div class="panel-head">
-                <h2>Raporty</h2>
-                <div class="toolbar-row wrap">
-                  <button class="ghost report-preset" data-days="5" type="button">5 dni</button>
-                  <button class="ghost report-preset active" data-days="7" type="button">7 dni</button>
-                  <button class="ghost report-preset" data-days="30" type="button">30 dni</button>
-                </div>
-              </div>
-
-              <div class="toolbar-row wrap report-tools">
-                <input id="reportFrom" type="date" />
-                <input id="reportTo" type="date" />
-                <button id="reportRangeBtn" class="ghost" type="button">Zakres</button>
-                <input id="reportMonth" type="month" />
-                <button id="reportMonthBtn" class="ghost" type="button">Miesiac</button>
-              </div>
-
-              <div class="metrics-grid">
-                <article class="metric">
-                  <h3>Srednia kcal</h3>
-                  <strong id="metricAverage">-</strong>
-                </article>
-                <article class="metric">
-                  <h3>Suma kcal</h3>
-                  <strong id="metricTotal">-</strong>
-                </article>
-                <article class="metric">
-                  <h3>Dni powyzej celu</h3>
-                  <strong id="metricAbove">-</strong>
-                </article>
-                <article class="metric">
-                  <h3>Wpisy</h3>
-                  <strong id="metricEntries">-</strong>
-                </article>
-              </div>
-
-              <div id="reportChart" class="chart"></div>
-              <div id="reportTable" class="report-table"></div>
-            </div>
-            <div class="panel-lock">
-              <h3>Raporty zablokowane</h3>
-              <p class="lock-copy">Wykresy, trendy i dane okresowe pojawia sie dopiero po poprawnym PIN-ie.</p>
-            </div>
-          </section>
-
-          <section id="userPanel" class="panel tab-panel user-protected-panel">
-            <div class="lockable-body">
-              <div class="panel-head">
-                <h2>Uzytkownik</h2>
-              </div>
-              <form id="profileForm" class="profile-form">
+          </header>
+          <div class="more-grid">
+            <article class="card profile-card">
+              <div class="card-head"><h2 class="card-title"><svg class="icon icon-accent"><use href="#i-user" /></svg>Profil i plan</h2><span id="profileTarget" class="chip"></span></div>
+              <form id="profileForm" class="form-grid" novalidate>
                 <div class="field">
-                  <label>Plec</label>
-                  <select name="sex">
-                    <option value="male">Mezczyzna</option>
+                  <label for="profileSex">Płeć</label>
+                  <select id="profileSex" name="sex" required>
+                    <option value="" disabled selected>– wybierz –</option>
+                    <option value="male">Mężczyzna</option>
                     <option value="female">Kobieta</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label>Wiek</label>
-                  <input type="number" name="age" value="30" min="10" max="100" step="1" required />
+                  <label for="profileAge">Wiek (lata)</label>
+                  <input id="profileAge" type="number" inputmode="numeric" name="age" min="10" max="100" step="1" required />
                 </div>
                 <div class="field">
-                  <label>Wzrost cm</label>
-                  <input type="number" name="height_cm" value="175" min="120" max="230" step="1" required />
+                  <label for="profileHeight">Wzrost (cm)</label>
+                  <input id="profileHeight" type="text" inputmode="decimal" name="height_cm" autocomplete="off" required />
                 </div>
                 <div class="field">
-                  <label>Waga kg</label>
-                  <input type="number" name="weight_kg" value="80" min="30" max="300" step="0.1" required />
+                  <label for="profileWeight">Waga planu (kg)</label>
+                  <input id="profileWeight" type="text" inputmode="decimal" name="weight_kg" autocomplete="off" required />
+                  <p id="profileCurrentWeight" class="hint"></p>
                 </div>
-                <div class="field">
-                  <label>Aktywnosc</label>
-                  <select name="activity_level">
-                    <option value="sedentary">Siedzacy tryb</option>
-                    <option value="light">Lekka aktywnosc</option>
-                    <option value="moderate">Umiarkowana aktywnosc</option>
-                    <option value="high">Wysoka aktywnosc</option>
-                    <option value="athlete">Sportowiec</option>
+                <div class="field span-2">
+                  <label for="profileActivity">Aktywność</label>
+                  <select id="profileActivity" name="activity_level" required>
+                    <option value="" disabled selected>– wybierz –</option>
+                    <option value="sedentary">Siedzący tryb życia (praca biurowa, brak treningów)</option>
+                    <option value="light">Lekka aktywność (1–3 treningi / tydzień)</option>
+                    <option value="moderate">Umiarkowana aktywność (3–5 treningów / tydzień)</option>
+                    <option value="high">Wysoka aktywność (6–7 treningów / tydzień)</option>
+                    <option value="athlete">Sportowiec / praca fizyczna + treningi</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label>Cel</label>
-                  <select name="goal_type">
+                  <label for="profileGoal">Cel</label>
+                  <select id="profileGoal" name="goal_type" required>
+                    <option value="" disabled selected>– wybierz –</option>
                     <option value="cut">Redukcja</option>
                     <option value="maintain">Utrzymanie</option>
                     <option value="bulk">Masa</option>
                   </select>
                 </div>
-                <div class="field">
-                  <label>Korekta celu (%)</label>
-                  <input type="number" name="goal_delta_pct_percent" step="1" min="0" max="30" value="0" />
-                  <p class="hint">Dla utrzymania 0%. Redukcja zwykle 10-20%. Masa zwykle 5-15%.</p>
+                <div class="field goal-delta-field" data-goal-delta>
+                  <label for="profileDelta" data-delta-label>Korekta celu</label>
+                  <div class="delta-input">
+                    <span class="delta-sign" data-delta-sign aria-hidden="true"></span>
+                    <input id="profileDelta" name="goal_delta_pct_percent" type="number" inputmode="numeric" min="0" max="30" step="1" required disabled />
+                    <span class="delta-unit" aria-hidden="true">%</span>
+                  </div>
+                  <p class="hint" data-delta-hint>Najpierw wybierz cel.</p>
                 </div>
-                <button type="submit">Zapisz profil</button>
+                <p class="goal-preview span-2" data-goal-preview aria-live="polite"></p>
+                <p class="hint span-2">Zapis profilu tworzy nowy plan: cel kcal liczony jest wzorem z wagi planu. Nowe wpisy „Waga” nie zmieniają celu automatycznie – służy do tego ocena planu w zakładce Cele.</p>
+                <button class="btn btn-primary span-2" type="submit">Zapisz profil</button>
+                <p id="profileStatus" class="form-status span-2" aria-live="polite"></p>
               </form>
-              <p id="profileStatus" class="form-status" aria-live="polite"></p>
-              <div class="danger-zone">
-                <h3>Strefa usuwania</h3>
-                <p class="hint">Po poprawnym PIN-ie mozesz usunac swoje konto. Z bazy znikna tez wszystkie dni i wpisy tego usera.</p>
-                <button id="deleteUserBtn" class="danger" type="button">Usun moje konto</button>
-              </div>
-            </div>
-            <div class="panel-lock">
-              <h3>Profil zablokowany</h3>
-              <p class="lock-copy">Parametry profilu i opcja usuniecia konta sa dostepne dopiero po weryfikacji PIN-u.</p>
-            </div>
-          </section>
+            </article>
 
-          <section id="adminPanel" class="panel tab-panel">
-            <div class="panel-head">
-              <h2>Admin</h2>
-            </div>
-            <div class="admin-auth">
-              <div class="field">
-                <label for="adminPinInput">Admin PIN</label>
-                <div class="row-inline">
-                  <input id="adminPinInput" type="password" maxlength="64" placeholder="PIN admina" />
-                  <button id="adminUnlockBtn" type="button">Odblokuj</button>
+            <div class="more-side">
+              <article class="card">
+                <div class="card-head"><h2 class="card-title"><svg class="icon"><use href="#i-key" /></svg>Zmiana PIN-u</h2></div>
+                <form id="pinChangeForm" class="inline-form">
+                  <input id="newPinInput" type="password" inputmode="numeric" maxlength="8" placeholder="Nowy PIN (4–8 cyfr)" autocomplete="new-password" aria-label="Nowy PIN" />
+                  <button class="btn btn-quiet" type="submit">Zmień</button>
+                </form>
+              </article>
+              <article class="card">
+                <div class="card-head"><h2 class="card-title"><svg class="icon"><use href="#i-download" /></svg>Eksport danych</h2></div>
+                <p class="card-sub">Wszystkie wpisy w pliku CSV (Excel, arkusze Google).</p>
+                <button id="exportBtn" class="btn btn-quiet btn-block" type="button">Pobierz CSV</button>
+              </article>
+              <article class="card">
+                <div class="card-head"><h2 class="card-title"><svg class="icon"><use href="#i-shield" /></svg>Administrator</h2></div>
+                <p class="card-sub">Logi diagnostyczne wpisów tekstowych (wymaga PIN-u administratora).</p>
+                <button id="moreAdminBtn" class="btn btn-quiet btn-block" type="button">Otwórz panel</button>
+              </article>
+              <article class="card">
+                <div class="card-head"><h2 class="card-title"><svg class="icon"><use href="#i-user" /></svg>Konto</h2></div>
+                <div class="button-col">
+                  <button id="logoutBtn" class="btn btn-quiet btn-block" type="button"><svg class="icon"><use href="#i-logout" /></svg>Zmień użytkownika</button>
+                  <button id="deleteUserBtn" class="btn btn-danger btn-block" type="button"><svg class="icon"><use href="#i-trash" /></svg>Usuń moje konto</button>
                 </div>
-              </div>
-              <p id="adminStatus" class="form-status">Tryb administracyjny nieaktywny.</p>
+                <p class="hint">Usunięcie konta kasuje wszystkie dni i wpisy tego użytkownika.</p>
+              </article>
             </div>
-
-            <div class="admin-layout">
-              <div class="field">
-                <label for="adminUserSelect">User z logami</label>
-                <select id="adminUserSelect"></select>
-              </div>
-              <div class="toolbar-row wrap">
-                <button id="adminRefreshBtn" class="ghost" type="button">Odswiez</button>
-                <button id="adminLoadLogsBtn" class="ghost" type="button">Pokaz logi</button>
-              </div>
-              <div id="adminSummary" class="meta-line">Brak danych diagnostycznych.</div>
-              <div id="adminLogs" class="admin-log-list"></div>
-            </div>
-          </section>
+          </div>
         </section>
-
-        <aside class="day-card panel user-protected-panel">
-          <div class="lockable-body">
-            <section class="day-card-block">
-              <div class="section-head">
-                <h2>Karta dnia</h2>
-                <p class="muted">Najwazniejsze liczby bez przechodzenia do raportow.</p>
-              </div>
-              <div class="status-list">
-                <div class="status-line"><span>Kalorie</span><span id="dayCaloriesCompact">-</span></div>
-                <div class="status-line"><span>Weglowodany</span><span id="carbsTotal">-</span></div>
-                <div class="status-line"><span>Tluszcze</span><span id="fatTotal">-</span></div>
-                <div class="status-line"><span>Bialko</span><span id="proteinTotal">-</span></div>
-              </div>
-            </section>
-
-            <section class="day-card-block">
-              <div class="section-head">
-                <h3>Raport 7 dni</h3>
-                <p class="muted">Biala linia oznacza cel kaloryczny dnia.</p>
-              </div>
-              <div id="miniReportChart" class="mini-report-chart"></div>
-            </section>
-          </div>
-          <div class="panel-lock">
-            <h3>Karta dnia zablokowana</h3>
-            <p class="lock-copy">Stan kalorii i makro pojawi sie dopiero po podaniu PIN-u wybranego uzytkownika.</p>
-          </div>
-        </aside>
       </main>
     </div>
+
+    <!-- PANEL ADMINISTRATORA (dostępny z ekranu blokady i z „Więcej”) -->
+    <section id="adminScreen" class="admin-screen" aria-labelledby="adminTitle" hidden>
+      <header class="screen-header">
+        <button id="adminBackBtn" class="icon-btn" type="button" aria-label="Wróć"><svg class="icon"><use href="#i-chevron-left" /></svg></button>
+        <div class="grow">
+          <h1 id="adminTitle">Administrator</h1>
+          <p class="screen-sub">Logi diagnostyczne wpisów tekstowych.</p>
+        </div>
+      </header>
+      <article class="card">
+        <form id="adminUnlockForm" class="inline-form">
+          <input id="adminPinInput" type="password" maxlength="64" placeholder="PIN administratora" aria-label="PIN administratora" />
+          <button id="adminUnlockBtn" class="btn btn-primary" type="submit">Odblokuj</button>
+        </form>
+        <p id="adminStatus" class="form-status"></p>
+      </article>
+      <article class="card">
+        <div class="field">
+          <label for="adminUserSelect">Użytkownik z logami</label>
+          <select id="adminUserSelect"></select>
+        </div>
+        <div class="button-row">
+          <button id="adminRefreshBtn" class="btn btn-quiet" type="button">Odśwież</button>
+        </div>
+        <p id="adminSummary" class="card-sub"></p>
+        <div id="adminLogs" class="admin-logs"></div>
+      </article>
+    </section>
+
+    <div id="toastRegion" class="toast-region" aria-live="polite"></div>
+
+    <!-- DOLNY PANEL: dodawanie / edycja wpisu -->
+    <dialog id="entrySheet" class="sheet" aria-labelledby="entrySheetTitle">
+      <div class="sheet-body">
+        <div class="sheet-grabber" aria-hidden="true"></div>
+        <header class="sheet-head">
+          <h2 id="entrySheetTitle">Dodaj posiłek</h2>
+          <button class="icon-btn" type="button" data-close aria-label="Zamknij"><svg class="icon"><use href="#i-close" /></svg></button>
+        </header>
+        <div id="entryModeSwitch" class="segmented" role="group" aria-label="Sposób wpisu">
+          <button class="seg active" type="button" data-mode="form">Formularz</button>
+          <button class="seg" type="button" data-mode="text">Wklej tekst</button>
+        </div>
+
+        <form id="entryForm" class="entry-form" novalidate>
+          <div id="entryTypes" class="type-chips" role="radiogroup" aria-label="Typ wpisu">
+            <button class="type-chip" type="button" data-type="breakfast" role="radio">Śniadanie</button>
+            <button class="type-chip" type="button" data-type="lunch" role="radio">Obiad</button>
+            <button class="type-chip" type="button" data-type="dinner" role="radio">Kolacja</button>
+            <button class="type-chip" type="button" data-type="snack" role="radio">Przekąska</button>
+            <button class="type-chip" type="button" data-type="daily_balance" role="radio">Bilans dnia</button>
+            <button class="type-chip" type="button" data-type="weight" role="radio">Waga</button>
+            <button class="type-chip" type="button" data-type="waist" role="radio">Obwód pasa</button>
+          </div>
+          <div class="field" id="entryDateField">
+            <label for="entryDate">Data</label>
+            <input id="entryDate" name="log_date" type="date" required />
+          </div>
+          <div class="macro-fields" data-fields="macro">
+            <div class="field"><label for="entryKcal">Kalorie (kcal)</label><input id="entryKcal" name="kcal" inputmode="decimal" autocomplete="off" /></div>
+            <div class="field"><label for="entryProtein">Białko (g)</label><input id="entryProtein" name="protein_g" inputmode="decimal" autocomplete="off" /></div>
+            <div class="field"><label for="entryCarbs">Węglowodany (g)</label><input id="entryCarbs" name="carbs_g" inputmode="decimal" autocomplete="off" /></div>
+            <div class="field"><label for="entryFat">Tłuszcze (g)</label><input id="entryFat" name="fat_g" inputmode="decimal" autocomplete="off" /></div>
+          </div>
+          <div class="measure-field" data-fields="weight">
+            <label for="entryWeight" class="visually-hidden">Waga (kg)</label>
+            <input id="entryWeight" class="big-number" name="weight_kg" inputmode="decimal" autocomplete="off" placeholder="0,0" />
+            <span class="big-unit">kg</span>
+          </div>
+          <div class="measure-field" data-fields="waist">
+            <label for="entryWaist" class="visually-hidden">Obwód pasa (cm)</label>
+            <input id="entryWaist" class="big-number" name="waist_cm" inputmode="decimal" autocomplete="off" placeholder="0,0" />
+            <span class="big-unit">cm</span>
+          </div>
+          <p id="entryHint" class="hint"></p>
+          <p id="entryError" class="form-status error" aria-live="polite"></p>
+          <button id="entrySaveBtn" class="btn btn-primary btn-block" type="submit">Zapisz</button>
+        </form>
+
+        <form id="textForm" class="entry-form" hidden>
+          <p class="hint">
+            Wklej wpis w formacie szablonu. Opcjonalna pierwsza linia <code>Data: RRRR-MM-DD</code>. Komendy: <code>pokaż dziś</code>, <code>cofnij ostatni</code>, <code>usuń 2</code>.
+            Zapis: <kbd>Ctrl</kbd>+<kbd>Enter</kbd>.
+          </p>
+          <textarea id="messageInput" rows="7" spellcheck="false" aria-label="Treść wpisu"></textarea>
+          <p id="textStatus" class="form-status text-status" aria-live="polite"></p>
+          <div class="button-row">
+            <button id="insertTemplateBtn" class="btn btn-quiet" type="button">Wstaw szablon</button>
+            <button id="textSendBtn" class="btn btn-primary" type="submit">Wyślij</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
+    <!-- DOLNY PANEL: akcje pozycji -->
+    <dialog id="actionSheet" class="sheet" aria-labelledby="actionSheetTitle">
+      <div class="sheet-body">
+        <div class="sheet-grabber" aria-hidden="true"></div>
+        <header class="sheet-head">
+          <div>
+            <h2 id="actionSheetTitle"></h2>
+            <p id="actionSheetSub" class="screen-sub"></p>
+          </div>
+          <button class="icon-btn" type="button" data-close aria-label="Zamknij"><svg class="icon"><use href="#i-close" /></svg></button>
+        </header>
+        <div class="action-list">
+          <button class="action-item" type="button" data-action="edit"><svg class="icon"><use href="#i-edit" /></svg>Edytuj</button>
+          <button class="action-item" type="button" data-action="duplicate"><svg class="icon"><use href="#i-copy" /></svg>Duplikuj…</button>
+          <button class="action-item" type="button" data-action="move"><svg class="icon"><use href="#i-move" /></svg>Przenieś do innego dnia…</button>
+          <button class="action-item danger" type="button" data-action="delete"><svg class="icon"><use href="#i-trash" /></svg>Usuń</button>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- DOLNY PANEL: wybór dnia (przenieś / duplikuj) -->
+    <dialog id="dateSheet" class="sheet" aria-labelledby="dateSheetTitle">
+      <form id="dateSheetForm" class="sheet-body">
+        <div class="sheet-grabber" aria-hidden="true"></div>
+        <header class="sheet-head">
+          <h2 id="dateSheetTitle">Przenieś wpis</h2>
+          <button class="icon-btn" type="button" data-close aria-label="Zamknij"><svg class="icon"><use href="#i-close" /></svg></button>
+        </header>
+        <p id="dateSheetCopy" class="card-sub"></p>
+        <div class="field">
+          <label for="dateSheetInput">Dzień docelowy</label>
+          <input id="dateSheetInput" type="date" required />
+        </div>
+        <p id="dateSheetError" class="form-status error" aria-live="polite"></p>
+        <button id="dateSheetSaveBtn" class="btn btn-primary btn-block" type="submit">Zatwierdź</button>
+      </form>
+    </dialog>
+
+    <!-- DOLNY PANEL: własny zakres postępów -->
+    <dialog id="rangeSheet" class="sheet" aria-labelledby="rangeSheetTitle">
+      <form id="rangeSheetForm" class="sheet-body">
+        <div class="sheet-grabber" aria-hidden="true"></div>
+        <header class="sheet-head">
+          <h2 id="rangeSheetTitle">Własny zakres</h2>
+          <button class="icon-btn" type="button" data-close aria-label="Zamknij"><svg class="icon"><use href="#i-close" /></svg></button>
+        </header>
+        <div class="form-grid">
+          <div class="field"><label for="rangeFrom">Od</label><input id="rangeFrom" type="date" required /></div>
+          <div class="field"><label for="rangeTo">Do</label><input id="rangeTo" type="date" required /></div>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit">Pokaż</button>
+      </form>
+    </dialog>
+
+    <!-- Nowy użytkownik -->
+    <dialog id="userDialog" class="sheet" aria-labelledby="userDialogTitle">
+      <form id="userDialogForm" class="sheet-body">
+        <div class="sheet-grabber" aria-hidden="true"></div>
+        <header class="sheet-head">
+          <h2 id="userDialogTitle">Nowy użytkownik</h2>
+          <button class="icon-btn" type="button" data-close aria-label="Zamknij"><svg class="icon"><use href="#i-close" /></svg></button>
+        </header>
+        <div class="field">
+          <label for="newUserName">Nazwa</label>
+          <input id="newUserName" maxlength="128" required autocomplete="off" />
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="newUserPin">PIN (4–8 cyfr)</label>
+            <input id="newUserPin" type="password" inputmode="numeric" maxlength="8" required autocomplete="new-password" />
+          </div>
+          <div class="field">
+            <label for="newUserPin2">Powtórz PIN</label>
+            <input id="newUserPin2" type="password" inputmode="numeric" maxlength="8" required autocomplete="new-password" />
+          </div>
+        </div>
+        <p id="userDialogError" class="form-status error" aria-live="polite"></p>
+        <button id="userDialogSaveBtn" class="btn btn-primary btn-block" type="submit">Utwórz i przejdź do profilu</button>
+      </form>
+    </dialog>
+
+    <!-- Wymuszone uzupełnienie profilu (nie da się zamknąć) -->
+    <dialog id="onboardingDialog" class="sheet sheet-tall" aria-labelledby="onboardingTitle">
+      <form id="onboardingForm" class="sheet-body" novalidate>
+        <header class="sheet-head">
+          <div>
+            <h2 id="onboardingTitle">Uzupełnij profil</h2>
+            <p class="screen-sub">Dane startowe Calico – na ich podstawie powstaje plan kaloryczny i punkt startowy śledzenia wagi. Tego kroku nie da się pominąć.</p>
+          </div>
+        </header>
+        <div class="form-grid">
+          <div class="field">
+            <label for="onbSex">Płeć</label>
+            <select id="onbSex" name="sex" required>
+              <option value="" disabled selected>– wybierz –</option>
+              <option value="male">Mężczyzna</option>
+              <option value="female">Kobieta</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="onbAge">Wiek (lata)</label>
+            <input id="onbAge" name="age" type="number" inputmode="numeric" min="10" max="100" step="1" required />
+          </div>
+          <div class="field">
+            <label for="onbHeight">Wzrost (cm)</label>
+            <input id="onbHeight" name="height_cm" type="text" inputmode="decimal" autocomplete="off" placeholder="np. 175" required />
+          </div>
+          <div class="field">
+            <label for="onbWeight">Aktualna waga (kg)</label>
+            <input id="onbWeight" name="weight_kg" type="text" inputmode="decimal" autocomplete="off" placeholder="np. 82,4" required />
+          </div>
+          <div class="field span-2">
+            <label for="onbActivity">Aktywność</label>
+            <select id="onbActivity" name="activity_level" required>
+              <option value="" disabled selected>– wybierz –</option>
+              <option value="sedentary">Siedzący tryb życia (praca biurowa, brak treningów)</option>
+              <option value="light">Lekka aktywność (1–3 treningi / tydzień)</option>
+              <option value="moderate">Umiarkowana aktywność (3–5 treningów / tydzień)</option>
+              <option value="high">Wysoka aktywność (6–7 treningów / tydzień)</option>
+              <option value="athlete">Sportowiec / praca fizyczna + treningi</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="onbGoal">Cel</label>
+            <select id="onbGoal" name="goal_type" required>
+              <option value="" disabled selected>– wybierz –</option>
+              <option value="cut">Redukcja</option>
+              <option value="maintain">Utrzymanie</option>
+              <option value="bulk">Masa</option>
+            </select>
+          </div>
+          <div class="field goal-delta-field" data-goal-delta>
+            <label for="onbDelta" data-delta-label>Korekta celu</label>
+            <div class="delta-input">
+              <span class="delta-sign" data-delta-sign aria-hidden="true"></span>
+              <input id="onbDelta" name="goal_delta_pct_percent" type="number" inputmode="numeric" min="0" max="30" step="1" required disabled />
+              <span class="delta-unit" aria-hidden="true">%</span>
+            </div>
+            <p class="hint" data-delta-hint>Najpierw wybierz cel.</p>
+          </div>
+          <p class="goal-preview span-2" data-goal-preview aria-live="polite"></p>
+        </div>
+        <p id="onboardingError" class="form-status error" aria-live="polite"></p>
+        <div class="button-row spread">
+          <button id="onboardingLogoutBtn" class="btn btn-quiet" type="button">Zmień użytkownika</button>
+          <button id="onboardingSaveBtn" class="btn btn-primary" type="submit">Zapisz i rozpocznij</button>
+        </div>
+      </form>
+    </dialog>
 
     <script src="/main.js"></script>
   </body>

@@ -1,15 +1,26 @@
-import re
-from datetime import date, datetime
+import hmac
+import mimetypes
+from contextlib import asynccontextmanager
+from datetime import date
+from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
+from fastapi.responses import JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
+from . import clock, plan, services
 from .config import settings
 from .db import SessionLocal, healthcheck, init_db
-from .diagnostics import diagnostics_enabled, diagnostics_entries_for_user, diagnostics_user_summaries, log_chat_interaction
-from .models import DayEntry, Profile, User
+from .diagnostics import (
+    delete_user_diagnostics,
+    diagnostics_enabled,
+    diagnostics_entries_for_user,
+    diagnostics_user_summaries,
+    log_chat_interaction,
+)
+from .models import User
 from .schemas import (
     AdminStatusOut,
     AdminVerifyIn,
@@ -18,92 +29,75 @@ from .schemas import (
     ChatMessageIn,
     ChatResponseOut,
     DayDetailOut,
-    DayEntryMoveIn,
-    DayEntryOut,
-    DayEntryUpdateIn,
     DaySummaryOut,
     DiagnosticsLogEntryOut,
     DiagnosticsUserSummaryOut,
+    EntryCreateIn,
+    EntryDuplicateIn,
+    EntryMoveIn,
+    EntryUpdateIn,
+    PlanApplyIn,
+    PlanStatusOut,
+    ProfilePreviewOut,
+    PinChangeIn,
     ProfileIn,
     ProfileOut,
     ReportSummaryOut,
     UserCreate,
     UserOut,
 )
-from .services import (
-    COMMAND_SHOW_TODAY,
-    COMMAND_SUMMARY,
-    COMMAND_UNDO,
-    clear_day_entries,
-    close_day,
-    create_day_entry,
-    create_user,
-    day_entry_by_id,
-    day_entry_by_position,
-    day_summary,
-    delete_day_entry_by_id,
-    delete_day_entry_by_position,
-    delete_user,
-    format_day_overview,
-    format_entry_summary,
-    get_day_log,
-    get_or_create_day_log,
-    help_text,
-    list_day_entries,
-    list_day_logs,
-    list_users,
-    parse_month_to_range,
-    parse_template_message,
-    recalculate_day_totals,
-    report_for_range,
-    reopen_day,
-    require_user_pin,
-    undo_last_entry,
-    update_day_entry_from_payload,
-    upsert_profile,
-)
 
-app = FastAPI(title=settings.app_name)
-DELETE_POSITION_PATTERN = re.compile(r"\busun(?:\s+pozycje)?(?:\s+nr)?\s+(\d+)\b", flags=re.IGNORECASE)
+FRONTEND_DIR = Path(settings.frontend_dir)
+# Typy, ktorych brakuje w domyslnej bazie mimetypes (przy X-Content-Type-Options: nosniff musza byc poprawne).
+mimetypes.add_type("font/woff2", ".woff2")
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 
-def build_day_detail(day_log, entries) -> DayDetailOut:
-    entry_items = [
-        DayEntryOut(
-            id=entry.id,
-            position=index,
-            entry_type=entry.entry_type,
-            entry_label=entry.entry_label,
-            source_text=entry.source_text,
-            kcal=round(entry.kcal, 1) if entry.kcal is not None else None,
-            carbs_g=round(entry.carbs_g, 1) if entry.carbs_g is not None else None,
-            fat_g=round(entry.fat_g, 1) if entry.fat_g is not None else None,
-            protein_g=round(entry.protein_g, 1) if entry.protein_g is not None else None,
-            weight_kg=round(entry.weight_kg, 2) if entry.weight_kg is not None else None,
-            waist_cm=round(entry.waist_cm, 1) if entry.waist_cm is not None else None,
-            created_at=entry.created_at,
-        )
-        for index, entry in enumerate(entries, start=1)
-    ]
-    return DayDetailOut(
-        user_id=day_log.user_id,
-        log_date=day_log.log_date,
-        status=day_log.status,
-        total_kcal=round(day_log.total_kcal, 1),
-        target_kcal=round(day_log.daily_kcal_target_snapshot, 1),
-        total_carbs_g=round(day_log.total_carbs_g, 1),
-        total_fat_g=round(day_log.total_fat_g, 1),
-        total_protein_g=round(day_log.total_protein_g, 1),
-        balance_mode=bool(day_log.balance_mode),
-        entries=entry_items,
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
+
+if settings.cors_origin:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[origin.strip() for origin in settings.cors_origin.split(",") if origin.strip()],
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
 
-def require_admin_pin(pin: str) -> None:
-    if not diagnostics_enabled():
-        raise HTTPException(status_code=404, detail="Admin mode disabled")
-    if pin != settings.admin_pin:
-        raise HTTPException(status_code=401, detail="Invalid admin PIN")
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'",
+    )
+    if request.url.path.startswith("/api/"):
+        response.headers.setdefault("Cache-Control", "no-store")
+    return response
+
+
+@app.exception_handler(services.InputError)
+async def input_error_handler(_request: Request, exc: services.InputError):
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+
+@app.exception_handler(services.ConflictError)
+async def conflict_error_handler(_request: Request, exc: services.ConflictError):
+    return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+
+@app.exception_handler(services.NotFoundError)
+async def not_found_handler(_request: Request, exc: services.NotFoundError):
+    return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
 def get_db():
@@ -118,23 +112,49 @@ def get_db():
         db.close()
 
 
-@app.on_event("startup")
-def startup():
-    init_db()
+def current_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    x_user_pin: str = Header(..., alias="X-User-PIN"),
+) -> User:
+    """user_id pochodzi ze sciezki (/users/{user_id}) albo z query (?user_id=)."""
+    user = services.require_user_pin(db, user_id, x_user_pin)
+    if not user:
+        raise HTTPException(status_code=401, detail="Niepoprawny PIN")
+    return user
 
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[settings.cors_origin] if settings.cors_origin != "*" else ["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+PROFILE_REQUIRED_DETAIL = "Uzupełnij profil (płeć, wiek, wzrost, waga, aktywność, cel) – bez niego CALICO nie może wyliczyć planu."
+
+
+def profiled_user(user: User = Depends(current_user), db: Session = Depends(get_db)) -> User:
+    """Uzytkownik z uzupelnionym profilem - wymagane dla wszystkich danych dziennika, raportow i planu."""
+    if not services.is_profile_complete(db, user.id):
+        raise HTTPException(status_code=428, detail=PROFILE_REQUIRED_DETAIL)
+    return user
+
+
+def require_admin_pin(pin: str) -> None:
+    if not diagnostics_enabled():
+        raise HTTPException(status_code=404, detail="Tryb Admin jest wyłączony")
+    if not hmac.compare_digest(pin.encode("utf-8"), settings.admin_pin.encode("utf-8")):
+        raise HTTPException(status_code=401, detail="Niepoprawny PIN administratora")
+
+
+# --- system ---------------------------------------------------------------------
 
 
 @app.get("/health")
 def health():
     return {"ok": healthcheck()}
+
+
+@app.get("/api/meta")
+def api_meta():
+    return {"today": clock.today(), "timezone": settings.app_timezone}
+
+
+# --- admin ----------------------------------------------------------------------
 
 
 @app.get("/api/admin/status", response_model=AdminStatusOut)
@@ -149,10 +169,7 @@ def api_admin_verify(payload: AdminVerifyIn):
 
 
 @app.get("/api/admin/diagnostics/users", response_model=list[DiagnosticsUserSummaryOut])
-def api_admin_diagnostics_users(
-    db: Session = Depends(get_db),
-    x_admin_pin: str = Header(..., alias="X-Admin-PIN"),
-):
+def api_admin_diagnostics_users(db: Session = Depends(get_db), x_admin_pin: str = Header(..., alias="X-Admin-PIN")):
     require_admin_pin(x_admin_pin)
     return diagnostics_user_summaries(db)
 
@@ -167,321 +184,248 @@ def api_admin_diagnostics_logs(
     require_admin_pin(x_admin_pin)
     user = db.get(User, user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    safe_limit = min(max(limit, 1), 1000)
-    return diagnostics_entries_for_user(user, limit=safe_limit)
+        raise HTTPException(status_code=404, detail="Nie znaleziono użytkownika")
+    return diagnostics_entries_for_user(user, limit=min(max(limit, 1), 1000))
+
+
+# --- uzytkownicy i profil -------------------------------------------------------
 
 
 @app.get("/api/users", response_model=list[UserOut])
 def api_list_users(db: Session = Depends(get_db)):
-    return list_users(db)
+    return services.list_users(db)
 
 
 @app.post("/api/users", response_model=UserOut)
 def api_create_user(payload: UserCreate, db: Session = Depends(get_db)):
-    try:
-        return create_user(db, payload.display_name, payload.pin)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return services.create_user(db, payload.display_name, payload.pin)
 
 
 @app.delete("/api/users/{user_id}", response_model=AuthVerifyOut)
-def api_delete_user(user_id: int, db: Session = Depends(get_db), x_user_pin: str = Header(..., alias="X-User-PIN")):
-    user = require_user_pin(db, user_id, x_user_pin)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid PIN")
-    delete_user(db, user)
+def api_delete_user(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    services.delete_user(db, user)
+    db.commit()
+    delete_user_diagnostics(user)
+    return AuthVerifyOut(ok=True)
+
+
+@app.post("/api/users/{user_id}/pin", response_model=AuthVerifyOut)
+def api_change_pin(payload: PinChangeIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    services.change_user_pin(db, user, payload.new_pin)
     return AuthVerifyOut(ok=True)
 
 
 @app.post("/api/auth/verify", response_model=AuthVerifyOut)
 def api_verify_auth(payload: AuthVerifyIn, db: Session = Depends(get_db)):
-    user = require_user_pin(db, payload.user_id, payload.pin)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid PIN")
+    if not services.require_user_pin(db, payload.user_id, payload.pin):
+        raise HTTPException(status_code=401, detail="Niepoprawny PIN")
     return AuthVerifyOut(ok=True)
 
 
+def _profile_out(db: Session, user_id: int) -> ProfileOut:
+    profile = services.get_profile(db, user_id)
+    if not profile or profile.completed_at is None:
+        return ProfileOut(user_id=user_id, is_complete=False)
+    out = ProfileOut(
+        user_id=user_id,
+        is_complete=True,
+        sex=profile.sex,
+        age=profile.age,
+        height_cm=profile.height_cm,
+        weight_kg=profile.weight_kg,
+        activity_level=profile.activity_level,
+        goal_type=profile.goal_type,
+        goal_delta_pct=profile.goal_delta_pct,
+        daily_kcal_target=profile.daily_kcal_target,
+        plan_tdee_kcal=profile.plan_tdee_kcal,
+        plan_started_on=profile.plan_started_on,
+    )
+    latest = services.latest_weight_entry(db, user_id)
+    if latest:
+        out.current_weight_kg = latest.weight_kg
+        out.current_weight_date = latest.day_log.log_date
+    return out
+
+
 @app.get("/api/profile/{user_id}", response_model=ProfileOut)
-def api_get_profile(user_id: int, db: Session = Depends(get_db), x_user_pin: str = Header(..., alias="X-User-PIN")):
-    if not require_user_pin(db, user_id, x_user_pin):
-        raise HTTPException(status_code=401, detail="Invalid PIN")
-    profile = db.scalar(select(Profile).where(Profile.user_id == user_id))
-    if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
-    return profile
+def api_get_profile(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return _profile_out(db, user.id)
 
 
 @app.put("/api/profile/{user_id}", response_model=ProfileOut)
-def api_put_profile(user_id: int, payload: ProfileIn, db: Session = Depends(get_db), x_user_pin: str = Header(..., alias="X-User-PIN")):
-    user = require_user_pin(db, user_id, x_user_pin)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid PIN")
-    return upsert_profile(db, user_id=user_id, payload=payload)
+def api_put_profile(payload: ProfileIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    services.upsert_profile(db, user_id=user.id, payload=payload)
+    return _profile_out(db, user.id)
+
+
+@app.post("/api/profile/{user_id}/preview", response_model=ProfilePreviewOut)
+def api_profile_preview(payload: ProfileIn, user: User = Depends(current_user)):
+    """Podglad wyliczen dla formularza profilu - nic nie zapisuje, dziala takze przed uzupelnieniem profilu."""
+    tdee = services.calculate_tdee(payload)
+    target = services.calculate_target(payload)
+    return ProfilePreviewOut(
+        bmr_kcal=round(services.calculate_bmr(payload), 0),
+        tdee_kcal=tdee,
+        target_kcal=target,
+        delta_kcal=round(target - tdee, 0),
+    )
+
+
+@app.get("/api/profile/{user_id}/plan", response_model=PlanStatusOut)
+def api_plan_status(user: User = Depends(profiled_user), db: Session = Depends(get_db)):
+    return plan.evaluate_plan(db, user.id)
+
+
+@app.post("/api/profile/{user_id}/plan/apply", response_model=PlanStatusOut)
+def api_plan_apply(payload: PlanApplyIn, user: User = Depends(profiled_user), db: Session = Depends(get_db)):
+    return plan.apply_suggestion(db, user.id, payload.target_kcal)
+
+
+# --- dni i wpisy ------------------------------------------------------------------
 
 
 @app.get("/api/days/current", response_model=DaySummaryOut)
-def api_current_day(user_id: int, db: Session = Depends(get_db), x_user_pin: str = Header(..., alias="X-User-PIN")):
-    user = require_user_pin(db, user_id, x_user_pin)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid PIN")
-    day_log = get_or_create_day_log(db, user_id=user_id, log_date=date.today())
-    recalculate_day_totals(db, day_log)
-    return day_summary(day_log)
+def api_current_day(user: User = Depends(profiled_user), db: Session = Depends(get_db)):
+    return services.day_totals_out(db, user.id, clock.today())
 
 
 @app.get("/api/days", response_model=list[DaySummaryOut])
-def api_list_days(
-    user_id: int,
-    limit: int = 30,
-    db: Session = Depends(get_db),
-    x_user_pin: str = Header(..., alias="X-User-PIN"),
-):
-    if not require_user_pin(db, user_id, x_user_pin):
-        raise HTTPException(status_code=401, detail="Invalid PIN")
-    days = list_day_logs(db, user_id=user_id, limit=limit)
-    return [day_summary(day) for day in days]
+def api_list_days(limit: int = 30, user: User = Depends(profiled_user), db: Session = Depends(get_db)):
+    return services.list_days(db, user_id=user.id, limit=limit)
 
 
 @app.get("/api/days/{log_date}", response_model=DayDetailOut)
-def api_day_detail(
-    log_date: date,
-    user_id: int,
-    db: Session = Depends(get_db),
-    x_user_pin: str = Header(..., alias="X-User-PIN"),
-):
-    if not require_user_pin(db, user_id, x_user_pin):
-        raise HTTPException(status_code=401, detail="Invalid PIN")
-    day_log = get_or_create_day_log(db, user_id=user_id, log_date=log_date)
-    recalculate_day_totals(db, day_log)
-    entries = list_day_entries(db, day_log)
-    return build_day_detail(day_log, entries)
+def api_day_detail(log_date: date, user: User = Depends(profiled_user), db: Session = Depends(get_db)):
+    return services.day_detail_out(db, user.id, log_date)
 
 
-@app.post("/api/days/{log_date}/close", response_model=DaySummaryOut)
-def api_close_day_by_date(
-    log_date: date,
-    user_id: int,
-    db: Session = Depends(get_db),
-    x_user_pin: str = Header(..., alias="X-User-PIN"),
-):
-    if not require_user_pin(db, user_id, x_user_pin):
-        raise HTTPException(status_code=401, detail="Invalid PIN")
-    day_log = get_or_create_day_log(db, user_id=user_id, log_date=log_date)
-    close_day(db, day_log)
-    return day_summary(day_log)
-
-
-@app.post("/api/days/{log_date}/reopen", response_model=DaySummaryOut)
-def api_reopen_day(
-    log_date: date,
-    user_id: int,
-    db: Session = Depends(get_db),
-    x_user_pin: str = Header(..., alias="X-User-PIN"),
-):
-    if not require_user_pin(db, user_id, x_user_pin):
-        raise HTTPException(status_code=401, detail="Invalid PIN")
-    day_log = get_or_create_day_log(db, user_id=user_id, log_date=log_date)
-    reopen_day(db, day_log)
-    return day_summary(day_log)
-
-
-@app.post("/api/days/{log_date}/clear", response_model=DayDetailOut)
-def api_clear_day(
-    log_date: date,
-    user_id: int,
-    db: Session = Depends(get_db),
-    x_user_pin: str = Header(..., alias="X-User-PIN"),
-):
-    if not require_user_pin(db, user_id, x_user_pin):
-        raise HTTPException(status_code=401, detail="Invalid PIN")
-    day_log = get_or_create_day_log(db, user_id=user_id, log_date=log_date)
-    clear_day_entries(db, day_log)
-    entries = list_day_entries(db, day_log)
-    return build_day_detail(day_log, entries)
+@app.post("/api/days/{log_date}/entries", response_model=DayDetailOut)
+def api_create_entry(log_date: date, payload: EntryCreateIn, user: User = Depends(profiled_user), db: Session = Depends(get_db)):
+    parsed = services.entry_input_from_values(payload, log_date=log_date)
+    _entry, day_log, _replaced = services.create_entry(db, user.id, parsed)
+    return services.day_detail_out(db, user.id, day_log.log_date)
 
 
 @app.patch("/api/days/{log_date}/entries/{entry_id}", response_model=DayDetailOut)
-def api_edit_day_entry(
+def api_update_entry(
     log_date: date,
     entry_id: int,
-    payload: DayEntryUpdateIn,
-    user_id: int,
+    payload: EntryUpdateIn,
+    user: User = Depends(profiled_user),
     db: Session = Depends(get_db),
-    x_user_pin: str = Header(..., alias="X-User-PIN"),
 ):
-    if not require_user_pin(db, user_id, x_user_pin):
-        raise HTTPException(status_code=401, detail="Invalid PIN")
-    day_log = get_or_create_day_log(db, user_id=user_id, log_date=log_date)
-    entry = day_entry_by_id(db, day_log, entry_id)
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    try:
-        parsed = parse_template_message(payload.source_text)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    parsed.log_date = log_date
-    updated_entry, target_day, _old_day = update_day_entry_from_payload(
-        db,
-        entry=entry,
-        user_id=user_id,
-        payload=parsed,
-        fallback_date=log_date,
-    )
-    entries = list_day_entries(db, target_day)
-    return build_day_detail(updated_entry.day_log, entries)
+    entry = services.get_entry(db, user.id, log_date, entry_id)
+    if payload.entry is not None:
+        parsed = services.entry_input_from_values(payload.entry)
+    elif payload.source_text is not None:
+        parsed = services.parse_template_message(payload.source_text)
+        parsed.log_date = None  # do zmiany dnia sluzy /move
+    else:
+        raise services.InputError("Podaj 'entry' albo 'source_text'.")
+    services.update_entry(db, user.id, entry, parsed)
+    return services.day_detail_out(db, user.id, log_date)
+
+
+@app.post("/api/days/{log_date}/entries/{entry_id}/move", response_model=DayDetailOut)
+def api_move_entry(
+    log_date: date,
+    entry_id: int,
+    payload: EntryMoveIn,
+    user: User = Depends(profiled_user),
+    db: Session = Depends(get_db),
+):
+    entry = services.get_entry(db, user.id, log_date, entry_id)
+    target_day = services.move_entry(db, user.id, entry, payload.target_date)
+    return services.day_detail_out(db, user.id, target_day.log_date)
+
+
+@app.post("/api/days/{log_date}/entries/{entry_id}/duplicate", response_model=DayDetailOut)
+def api_duplicate_entry(
+    log_date: date,
+    entry_id: int,
+    payload: EntryDuplicateIn,
+    user: User = Depends(profiled_user),
+    db: Session = Depends(get_db),
+):
+    entry = services.get_entry(db, user.id, log_date, entry_id)
+    _copy, target_day = services.duplicate_entry(db, user.id, entry, payload.target_date)
+    return services.day_detail_out(db, user.id, target_day.log_date)
 
 
 @app.delete("/api/days/{log_date}/entries/{entry_id}", response_model=DayDetailOut)
-def api_delete_day_entry(
-    log_date: date,
-    entry_id: int,
-    user_id: int,
-    db: Session = Depends(get_db),
-    x_user_pin: str = Header(..., alias="X-User-PIN"),
-):
-    if not require_user_pin(db, user_id, x_user_pin):
-        raise HTTPException(status_code=401, detail="Invalid PIN")
-    day_log = get_or_create_day_log(db, user_id=user_id, log_date=log_date)
-    deleted = delete_day_entry_by_id(db, day_log, entry_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Entry not found")
-    entries = list_day_entries(db, day_log)
-    return build_day_detail(day_log, entries)
+def api_delete_entry(log_date: date, entry_id: int, user: User = Depends(profiled_user), db: Session = Depends(get_db)):
+    services.delete_entry(db, user.id, log_date, entry_id)
+    return services.day_detail_out(db, user.id, log_date)
 
 
-@app.post("/api/reports/summary", response_model=ReportSummaryOut)
-def api_reports_summary(
-    user_id: int,
-    days: int = 7,
-    db: Session = Depends(get_db),
-    x_user_pin: str = Header(..., alias="X-User-PIN"),
-):
-    if not require_user_pin(db, user_id, x_user_pin):
-        raise HTTPException(status_code=401, detail="Invalid PIN")
-    safe_days = min(max(days, 1), 365)
-    date_to = date.today()
-    date_from = date.fromordinal(date_to.toordinal() - (safe_days - 1))
-    return report_for_range(db, user_id=user_id, date_from=date_from, date_to=date_to)
+@app.post("/api/days/{log_date}/undo", response_model=DayDetailOut)
+def api_undo_entry(log_date: date, user: User = Depends(profiled_user), db: Session = Depends(get_db)):
+    if not services.undo_last_entry(db, user.id, log_date):
+        raise services.NotFoundError("Brak wpisów do cofnięcia w tym dniu.")
+    return services.day_detail_out(db, user.id, log_date)
+
+
+@app.post("/api/days/{log_date}/clear", response_model=DayDetailOut)
+def api_clear_day(log_date: date, user: User = Depends(profiled_user), db: Session = Depends(get_db)):
+    services.clear_day(db, user.id, log_date)
+    return services.day_detail_out(db, user.id, log_date)
+
+
+# --- raporty i eksport ---------------------------------------------------------------
 
 
 @app.get("/api/reports/summary", response_model=ReportSummaryOut)
-def api_reports_summary_get(
-    user_id: int,
-    days: int = 7,
-    db: Session = Depends(get_db),
-    x_user_pin: str = Header(..., alias="X-User-PIN"),
-):
-    return api_reports_summary(user_id=user_id, days=days, db=db, x_user_pin=x_user_pin)
+def api_reports_summary(days: int = 7, user: User = Depends(profiled_user), db: Session = Depends(get_db)):
+    date_from, date_to = services.last_days_range(days)
+    return services.report_for_range(db, user_id=user.id, date_from=date_from, date_to=date_to)
 
 
 @app.get("/api/reports/range", response_model=ReportSummaryOut)
-def api_reports_range(
-    user_id: int,
-    date_from: date,
-    date_to: date,
-    db: Session = Depends(get_db),
-    x_user_pin: str = Header(..., alias="X-User-PIN"),
-):
-    if not require_user_pin(db, user_id, x_user_pin):
-        raise HTTPException(status_code=401, detail="Invalid PIN")
-    return report_for_range(db, user_id=user_id, date_from=date_from, date_to=date_to)
+def api_reports_range(date_from: date, date_to: date, user: User = Depends(profiled_user), db: Session = Depends(get_db)):
+    return services.report_for_range(db, user_id=user.id, date_from=date_from, date_to=date_to)
 
 
 @app.get("/api/reports/month", response_model=ReportSummaryOut)
-def api_reports_month(
-    user_id: int,
-    month: str,
-    db: Session = Depends(get_db),
-    x_user_pin: str = Header(..., alias="X-User-PIN"),
-):
-    if not require_user_pin(db, user_id, x_user_pin):
-        raise HTTPException(status_code=401, detail="Invalid PIN")
-    try:
-        date_from, date_to = parse_month_to_range(month)
-    except Exception as exc:
-        raise HTTPException(status_code=422, detail="Niepoprawny format month. Uzyj YYYY-MM.") from exc
-    return report_for_range(db, user_id=user_id, date_from=date_from, date_to=date_to)
+def api_reports_month(month: str, user: User = Depends(profiled_user), db: Session = Depends(get_db)):
+    date_from, date_to = services.parse_month_to_range(month)
+    return services.report_for_range(db, user_id=user.id, date_from=date_from, date_to=date_to)
+
+
+@app.get("/api/export")
+def api_export(user: User = Depends(profiled_user), db: Session = Depends(get_db)):
+    content = "﻿" + services.export_entries_csv(db, user.id)
+    file_name = f"calico-{user.slug}-{clock.today().isoformat()}.csv"
+    return Response(
+        content=content,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
+    )
+
+
+# --- czat -----------------------------------------------------------------------------
 
 
 @app.post("/api/chat/message", response_model=ChatResponseOut)
 def api_chat_message(payload: ChatMessageIn, db: Session = Depends(get_db), x_user_pin: str = Header(..., alias="X-User-PIN")):
-    user = require_user_pin(db, payload.user_id, x_user_pin)
+    user = services.require_user_pin(db, payload.user_id, x_user_pin)
     if not user:
-        raise HTTPException(status_code=401, detail="Invalid PIN")
+        raise HTTPException(status_code=401, detail="Niepoprawny PIN")
+    if not services.is_profile_complete(db, user.id):
+        raise HTTPException(status_code=428, detail=PROFILE_REQUIRED_DETAIL)
 
-    raw_user_message = payload.message.strip()
+    result = services.handle_chat_message(db, user.id, payload.message)
+    totals = services.day_totals_out(db, user.id, result.log_date)
+    response = ChatResponseOut(**totals.model_dump(), kind=result.kind, reply=result.text)
+    log_chat_interaction(
+        user,
+        payload.message.strip(),
+        response_payload=response.model_dump(mode="json"),
+        error_text=result.text if result.kind == "error" else None,
+    )
+    return response
 
-    def reply(day_log, *, text: str, warnings: list[str] | None = None) -> ChatResponseOut:
-        response = ChatResponseOut(
-            reply=text,
-            log_date=day_log.log_date,
-            total_kcal=round(day_log.total_kcal, 1),
-            target_kcal=round(day_log.daily_kcal_target_snapshot, 1),
-            total_carbs_g=round(day_log.total_carbs_g, 1),
-            total_fat_g=round(day_log.total_fat_g, 1),
-            total_protein_g=round(day_log.total_protein_g, 1),
-            status=day_log.status,
-            balance_mode=bool(day_log.balance_mode),
-            warnings=warnings or [],
-        )
-        log_chat_interaction(user, raw_user_message, response_payload=response.model_dump(mode="json"))
-        return response
 
-    normalized = " ".join(raw_user_message.lower().split())
-    current_day = get_or_create_day_log(db, user_id=payload.user_id, log_date=date.today())
+# --- frontend (musi byc na koncu, po trasach API) ------------------------------------
 
-    if normalized in {"pomoc", "help", "co umiesz"}:
-        recalculate_day_totals(db, current_day)
-        return reply(current_day, text=help_text())
-
-    if normalized in COMMAND_SHOW_TODAY or normalized in COMMAND_SUMMARY:
-        recalculate_day_totals(db, current_day)
-        entries = list_day_entries(db, current_day)
-        return reply(current_day, text=format_day_overview(current_day, entries))
-
-    if normalized in COMMAND_UNDO:
-        deleted = undo_last_entry(db, current_day)
-        recalculate_day_totals(db, current_day)
-        text = "Usunalem ostatni wpis." if deleted else "Brak wpisow do usuniecia."
-        return reply(current_day, text=text)
-
-    delete_match = DELETE_POSITION_PATTERN.search(raw_user_message)
-    if delete_match:
-        position = int(delete_match.group(1))
-        deleted = delete_day_entry_by_position(db, current_day, position)
-        recalculate_day_totals(db, current_day)
-        if not deleted:
-            return reply(
-                current_day,
-                text=f"Nie znalazlem pozycji nr {position}. Uzyj 'pokaz dzis', aby zobaczyc aktualna numeracje.",
-            )
-        entries = list_day_entries(db, current_day)
-        return reply(
-            current_day,
-            text=f"Usunalem pozycje nr {position}: {format_entry_summary(deleted)}.\n" + format_day_overview(current_day, entries),
-        )
-
-    try:
-        parsed = parse_template_message(raw_user_message)
-    except ValueError as exc:
-        recalculate_day_totals(db, current_day)
-        return reply(current_day, text=str(exc))
-
-    target_date = parsed.log_date or date.today()
-    target_day = get_or_create_day_log(db, user_id=payload.user_id, log_date=target_date)
-    target_day.status = "open"
-    entry = create_day_entry(db, target_day, parsed)
-    recalculate_day_totals(db, target_day)
-
-    if entry.entry_type == "weight":
-        message = f"Zapisalem wage dla dnia {target_day.log_date}: {entry.weight_kg:.1f} kg."
-    elif entry.entry_type == "waist":
-        message = f"Zapisalem obwod pasa dla dnia {target_day.log_date}: {entry.waist_cm:.1f} cm."
-    else:
-        message = f"Zapisalem wpis: {entry.entry_label}. " + format_entry_summary(entry)
-
-    if target_day.balance_mode:
-        message += "\nBilans dnia zastępuje sumę posilkow dla tego dnia."
-
-    return reply(target_day, text=message)
+if FRONTEND_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
