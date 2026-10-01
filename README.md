@@ -197,6 +197,8 @@ Full check as in CI (ruff + pytest in a container, `node --check` of frontend mo
 
 ## Project documentation
 
+See [`CHANGELOG.md`](CHANGELOG.md) for what changed in each version.
+
 Internal project documents are written in Polish (the project's working language).
 
 - `docs/decisions.md` — product decisions and open tasks (source of truth for further work),

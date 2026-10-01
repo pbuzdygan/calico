@@ -83,3 +83,4 @@ Wszystko naraz, tak jak CI (`.github/workflows/ci.yml`: ruff + pytest + `node --
 - Frontend: każdy tekst z danych wstawiany do HTML przez `escapeHtml()` albo `textContent`. Komunikaty dla użytkownika przez `toast()`; akcje z przyciskami przez `withBusy()`.
 - Nie commituj `.env`, baz `*.db` ani plików z `/data`.
 - Po zakończeniu zadania usuń je z zadań otwartych w `docs/decisions.md`; nowa decyzja właściciela = nowy wiersz w sekcji 1.
+- Zmiana widoczna dla użytkownika = wpis w `CHANGELOG.md` w tym samym commicie: po angielsku, w sekcji `## [Unreleased]` na górze (utwórz ją, jeśli nie ma), w podsekcji `New Features` / `Improvements` / `Bug Fixes`. Pisz nietechnicznie, z perspektywy użytkownika: co teraz może zrobić albo co działa lepiej (bez nazw endpointów, plików i ID zadań). Wydanie = zamiana `[Unreleased]` na numer wersji i datę.
