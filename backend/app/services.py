@@ -35,6 +35,10 @@ class ConflictError(ValueError):
     """Operacja koliduje z istniejacymi danymi (HTTP 409)."""
 
 
+class ForbiddenError(PermissionError):
+    """Operacja wylaczona konfiguracja (HTTP 403)."""
+
+
 class NotFoundError(LookupError):
     """Brak obiektu (HTTP 404)."""
 
@@ -461,7 +465,14 @@ def list_users(db: Session) -> list[User]:
     return list(db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.display_name)))
 
 
+def signup_allowed(db: Session) -> bool:
+    """ALLOW_SIGNUP=false blokuje nowe konta, ale pierwszy uzytkownik musi moc powstac (D10)."""
+    return settings.allow_signup or not db.scalar(select(func.count(User.id)))
+
+
 def create_user(db: Session, display_name: str, pin: str) -> User:
+    if not signup_allowed(db):
+        raise ForbiddenError("Zakładanie nowych kont jest wyłączone (ALLOW_SIGNUP=false).")
     if not validate_pin(pin):
         raise InputError("PIN musi mieć 4-8 cyfr.")
     display_name = display_name.strip()

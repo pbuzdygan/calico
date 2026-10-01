@@ -117,6 +117,7 @@ Wolumen z danymi zostaje ten sam. Przy pierwszym starcie baza jest migrowana aut
 | `APP_TIMEZONE` | `Europe/Warsaw` | strefa, w której liczony jest „dzisiejszy” dzień |
 | `SQLITE_PATH` | `/data/calico.db` | ścieżka bazy |
 | `CORS_ORIGIN` | pusty | pusty = brak CORS (frontend i API na tym samym adresie) |
+| `ALLOW_SIGNUP` | `true` | `false` = nowe konta można zakładać tylko przy pierwszym starcie (gdy nie ma żadnego użytkownika); `POST /api/users` zwraca wtedy `403` |
 | `SESSION_TTL_HOURS` | `12` | jak długo ważna jest sesja po odblokowaniu PIN-em |
 | `SESSION_SECRET` | pusty | klucz podpisu sesji; pusty = generowany automatycznie i zapisany w bazie |
 
@@ -126,7 +127,7 @@ Wszystkie endpointy danych wymagają parametru `user_id` (query albo ścieżka) 
 
 Użytkownicy i profil:
 
-- `GET /api/users` (pusta lista = pierwszy start), `POST /api/users` — `{"display_name": "Ala", "pin": "2468"}`, `DELETE /api/users/{user_id}`
+- `GET /api/users` (pusta lista = pierwszy start), `POST /api/users` — `{"display_name": "Ala", "pin": "2468"}` (`403`, gdy `ALLOW_SIGNUP=false` i istnieje już użytkownik), `DELETE /api/users/{user_id}`
 - `POST /api/users/{user_id}/pin` — `{"new_pin": "5678"}`; unieważnia stare tokeny i zwraca nowy
 - `POST /api/auth/verify` — `{"user_id": 1, "pin": "1234"}` → `{"ok": true, "token": "…", "expires_at": "…"}`
 - `GET|PUT /api/profile/{user_id}` — `is_complete=false` i puste pola, dopóki profil nie zostanie zapisany; `PUT` wymaga wszystkich pól. `weight_kg` to waga planu, `current_weight_kg` to ostatni pomiar. `macro_targets`: obowiązujące cele `protein_g`, `fat_g`, `carbs_g` oraz `manual_*` (null = automatycznie)
@@ -157,7 +158,7 @@ Raporty i eksport:
 
 Czat tekstowy: `POST /api/chat/message` — odpowiedź ma pole `kind`: `saved`, `info` albo `error`.
 
-Pozostałe: `GET /health`, `GET /api/meta` (dzisiejsza data serwera i strefa).
+Pozostałe: `GET /health`, `GET /api/meta` (dzisiejsza data serwera, strefa, `allow_signup`).
 
 ## Testy
 

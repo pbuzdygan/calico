@@ -366,12 +366,13 @@ function lockUser(message = "") {
 }
 
 async function loadUsers(selectId = null) {
-  const users = await fetchJSON(`${API_BASE}/users`);
+  const [users, meta] = await Promise.all([fetchJSON(`${API_BASE}/users`), fetchJSON(`${API_BASE}/meta`)]);
   el.userSelect.innerHTML = "";
   const firstRun = !users.length;
   el.firstRun.hidden = !firstRun;
   el.unlockForm.hidden = firstRun;
-  el.lockLinks.hidden = firstRun;
+  // ALLOW_SIGNUP=false: bez przycisku "Nowy użytkownik" (pierwszy start działa zawsze).
+  el.lockLinks.hidden = firstRun || !meta.allow_signup;
   if (firstRun) {
     state.userId = null;
     return;

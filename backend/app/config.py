@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     app_timezone: str = "Europe/Warsaw"
     sqlite_path: str = "/data/calico.db"
     cors_origin: str = ""
+    # false = nowe konta tylko gdy nie ma jeszcze zadnego uzytkownika (pierwszy start, D10).
+    allow_signup: bool = True
     frontend_dir: str = "/app/frontend"
     # Pusty = sekret generowany automatycznie i zapisany w bazie (app_meta.session_secret).
     session_secret: str = ""

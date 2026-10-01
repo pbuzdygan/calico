@@ -84,6 +84,11 @@ async def conflict_error_handler(_request: Request, exc: services.ConflictError)
     return JSONResponse(status_code=409, content={"detail": str(exc)})
 
 
+@app.exception_handler(services.ForbiddenError)
+async def forbidden_handler(_request: Request, exc: services.ForbiddenError):
+    return JSONResponse(status_code=403, content={"detail": str(exc)})
+
+
 @app.exception_handler(services.NotFoundError)
 async def not_found_handler(_request: Request, exc: services.NotFoundError):
     return JSONResponse(status_code=404, content={"detail": str(exc)})
@@ -145,8 +150,8 @@ def health():
 
 
 @app.get("/api/meta")
-def api_meta():
-    return {"today": clock.today(), "timezone": settings.app_timezone}
+def api_meta(db: Session = Depends(get_db)):
+    return {"today": clock.today(), "timezone": settings.app_timezone, "allow_signup": services.signup_allowed(db)}
 
 
 # --- uzytkownicy i profil -------------------------------------------------------
