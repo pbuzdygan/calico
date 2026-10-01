@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 from app import plan
 
-from .conftest import PIN
+from .conftest import AUTH
 
 PLAN_START = date(2026, 5, 1)
 
@@ -29,7 +29,7 @@ def log_weights(api, frozen_clock, rate_per_week, days, start_weight=100.0, ever
 
 
 def plan_status(api):
-    response = api.client.get(f"/api/profile/{api.uid}/plan", headers=PIN)
+    response = api.client.get(f"/api/profile/{api.uid}/plan", headers=AUTH)
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -104,8 +104,8 @@ def test_apply_suggestion(api, frozen_clock):
     log_weights(api, frozen_clock, rate_per_week=-0.05, days=30)
     status = plan_status(api)
     url = f"/api/profile/{api.uid}/plan/apply"
-    assert api.client.post(url, json={"target_kcal": status["suggested_target_kcal"] + 50}, headers=PIN).status_code == 409
-    response = api.client.post(url, json={"target_kcal": status["suggested_target_kcal"]}, headers=PIN)
+    assert api.client.post(url, json={"target_kcal": status["suggested_target_kcal"] + 50}, headers=AUTH).status_code == 409
+    response = api.client.post(url, json={"target_kcal": status["suggested_target_kcal"]}, headers=AUTH)
     assert response.status_code == 200, response.text
     after = response.json()
     assert after["daily_kcal_target"] == status["suggested_target_kcal"]
@@ -115,7 +115,7 @@ def test_apply_suggestion(api, frozen_clock):
     assert new_profile["weight_kg"] == round(status["trend_weight_kg"], 1)
     assert new_profile["daily_kcal_target"] != profile["daily_kcal_target"]
     assert api.day("2026-05-31")["target_kcal"] == status["suggested_target_kcal"]
-    assert api.client.post(url, json={"target_kcal": 2000}, headers=PIN).status_code == 409
+    assert api.client.post(url, json={"target_kcal": 2000}, headers=AUTH).status_code == 409
 
 
 def test_floor_is_respected():

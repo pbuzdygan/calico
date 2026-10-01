@@ -12,4 +12,4 @@ You can expect a first answer within 7 days. Once a fix is released, the report 
 
 ## Scope
 
-CALICO runs on home networks and may be exposed to the internet behind a reverse proxy with HTTPS. The known limits of internet exposure (visible user list, PIN-only authentication, no TLS of its own) are documented in the "Security" section of the [README](README.md#security) – please read it before reporting them. Hardening that goes beyond that list is welcome.
+CALICO runs on home networks and may be exposed to the internet behind a reverse proxy with HTTPS. How it protects sign-ins and what a public instance needs (HTTPS at the reverse proxy, `FORWARDED_ALLOW_IPS`, recommended settings) is described in the "Security" section of the [README](README.md#security) – please read it before reporting. Reports about weaknesses in these protections, or hardening ideas beyond them, are welcome.

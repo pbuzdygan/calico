@@ -2,7 +2,7 @@
 
 from app import services
 
-from .conftest import PIN, meal
+from .conftest import AUTH, meal
 
 TODAY = "2026-06-15"
 
@@ -38,7 +38,7 @@ def test_incomplete_profile_has_no_macro_targets(fresh_api):
 
 def test_manual_protein_keeps_auto_fat_and_rebalances_carbs(api):
     target = api.profile()["daily_kcal_target"]
-    response = api.client.put(f"/api/profile/{api.uid}/macros", json={"protein_g": 180}, headers=PIN)
+    response = api.client.put(f"/api/profile/{api.uid}/macros", json={"protein_g": 180}, headers=AUTH)
     assert response.status_code == 200, response.text
     targets = response.json()["macro_targets"]
     auto = expected_auto(target)
@@ -49,18 +49,18 @@ def test_manual_protein_keeps_auto_fat_and_rebalances_carbs(api):
 
 def test_all_manual_targets_are_kept_as_entered(api):
     payload = {"protein_g": 150, "fat_g": 70, "carbs_g": 200}
-    targets = api.client.put(f"/api/profile/{api.uid}/macros", json=payload, headers=PIN).json()["macro_targets"]
+    targets = api.client.put(f"/api/profile/{api.uid}/macros", json=payload, headers=AUTH).json()["macro_targets"]
     assert macros_of({"macro_targets": targets}) == payload
 
 
 def test_carbs_never_negative(api):
-    targets = api.client.put(f"/api/profile/{api.uid}/macros", json={"protein_g": 400, "fat_g": 300}, headers=PIN).json()["macro_targets"]
+    targets = api.client.put(f"/api/profile/{api.uid}/macros", json={"protein_g": 400, "fat_g": 300}, headers=AUTH).json()["macro_targets"]
     assert targets["carbs_g"] == 0
 
 
 def test_clearing_manual_targets_returns_to_auto(api):
-    api.client.put(f"/api/profile/{api.uid}/macros", json={"protein_g": 180, "fat_g": 60}, headers=PIN)
-    response = api.client.put(f"/api/profile/{api.uid}/macros", json={}, headers=PIN)
+    api.client.put(f"/api/profile/{api.uid}/macros", json={"protein_g": 180, "fat_g": 60}, headers=AUTH)
+    response = api.client.put(f"/api/profile/{api.uid}/macros", json={}, headers=AUTH)
     profile = response.json()
     assert macros_of(profile) == expected_auto(profile["daily_kcal_target"])
 
@@ -71,24 +71,24 @@ def test_macro_targets_do_not_restart_plan(api, frozen_clock):
 
     before = api.profile()
     frozen_clock["now"] = frozen_clock["now"] + timedelta(days=3)
-    after = api.client.put(f"/api/profile/{api.uid}/macros", json={"protein_g": 160}, headers=PIN).json()
+    after = api.client.put(f"/api/profile/{api.uid}/macros", json={"protein_g": 160}, headers=AUTH).json()
     assert after["daily_kcal_target"] == before["daily_kcal_target"]
     assert after["plan_started_on"] == before["plan_started_on"]
 
 
 def test_macro_targets_validation(api):
     for payload in ({"protein_g": -1}, {"fat_g": 5000}, {"carbs_g": "dużo"}):
-        response = api.client.put(f"/api/profile/{api.uid}/macros", json=payload, headers=PIN)
+        response = api.client.put(f"/api/profile/{api.uid}/macros", json=payload, headers=AUTH)
         assert response.status_code == 422, payload
 
 
 def test_macro_targets_require_profile(fresh_api):
-    response = fresh_api.client.put(f"/api/profile/{fresh_api.uid}/macros", json={"protein_g": 150}, headers=PIN)
+    response = fresh_api.client.put(f"/api/profile/{fresh_api.uid}/macros", json={"protein_g": 150}, headers=AUTH)
     assert response.status_code == 428
 
 
 def test_day_reports_macro_targets_for_its_kcal_target(api):
-    api.client.put(f"/api/profile/{api.uid}/macros", json={"protein_g": 170}, headers=PIN)
+    api.client.put(f"/api/profile/{api.uid}/macros", json={"protein_g": 170}, headers=AUTH)
     api.chat(meal())
     day = api.day(TODAY)
     expected = services.macro_targets(day["target_kcal"], protein_g=170)
@@ -103,6 +103,6 @@ def test_day_reports_macro_targets_for_its_kcal_target(api):
 
 
 def test_profile_save_keeps_manual_macro_targets(api):
-    api.client.put(f"/api/profile/{api.uid}/macros", json={"protein_g": 175}, headers=PIN)
+    api.client.put(f"/api/profile/{api.uid}/macros", json={"protein_g": 175}, headers=AUTH)
     profile = api.put_profile(weight_kg=88)
     assert profile["macro_targets"]["manual_protein_g"] == 175

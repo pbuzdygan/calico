@@ -14,9 +14,9 @@ import "./views/progress.js";
 import "./views/goals.js";
 import "./views/settings.js";
 import { renderLanguageButtons } from "./language.js";
-import { applyTranslations } from "./i18n.js";
+import { applyTranslations, t } from "./i18n.js";
 import { readSession } from "./api.js";
-import { loadUsers, showScreen, startSession } from "./auth.js";
+import { focusLogin, loadUsers, showScreen, startSession } from "./auth.js";
 import { RING_CIRCUMFERENCE } from "./config.js";
 import { el, state } from "./state.js";
 
@@ -39,6 +39,7 @@ async function init() {
   }
   if (saved && state.userId === saved.userId) {
     // Wznowienie sesji po przeładowaniu karty - bez ponownego pytania o PIN.
+    state.userName = saved.userName || state.userName;
     try {
       await startSession(saved);
       return registerServiceWorker();
@@ -53,7 +54,7 @@ async function init() {
     }
   }
   showScreen("lock");
-  (state.userId ? el.pinInput : el.firstRunBtn).focus();
+  focusLogin();
   registerServiceWorker();
 }
 

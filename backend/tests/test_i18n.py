@@ -10,7 +10,7 @@ from pathlib import Path
 
 from app.locales.en import MESSAGES
 
-from .conftest import PIN, meal
+from .conftest import AUTH, TEST_PIN, meal
 
 APP = Path(__file__).resolve().parent.parent / "app"
 SOURCES = [path for path in APP.glob("*.py") if path.name != "i18n.py"]
@@ -100,21 +100,22 @@ def test_polish_text_goes_through_t():
 
 # --- zachowanie API w jezyku angielskim -----------------------------------------------------------
 
-EN = {**PIN, "Accept-Language": "en-GB,en;q=0.9"}
+def en():
+    return {**AUTH, "Accept-Language": "en-GB,en;q=0.9"}
 
 
 def test_api_messages_follow_accept_language(api):
-    response = api.client.post(f"/api/days/2026-06-15/entries?user_id={api.uid}", json={"entry_type": "lunch", "kcal": 500}, headers=EN)
+    response = api.client.post(f"/api/days/2026-06-15/entries?user_id={api.uid}", json={"entry_type": "lunch", "kcal": 500}, headers=en())
     assert response.status_code == 422
     assert "Missing fields" in response.json()["detail"]
-    polish = api.client.post(f"/api/days/2026-06-15/entries?user_id={api.uid}", json={"entry_type": "lunch", "kcal": 500}, headers=PIN)
+    polish = api.client.post(f"/api/days/2026-06-15/entries?user_id={api.uid}", json={"entry_type": "lunch", "kcal": 500}, headers=AUTH)
     assert "Brakuje pól" in polish.json()["detail"]
 
 
 def test_entry_labels_and_numbers_in_english(api):
     api.chat(meal("Kolacja"))
     api.chat(meal("Kolacja", kcal=300))
-    day = api.client.get(f"/api/days/2026-06-15?user_id={api.uid}", headers=EN).json()
+    day = api.client.get(f"/api/days/2026-06-15?user_id={api.uid}", headers=en()).json()
     assert [entry["entry_label"] for entry in day["entries"]] == ["Dinner", "Dinner 2"]
     assert day["entries"][1]["source_text"].startswith("Dinner\nCalories: 300")
     # w bazie etykiety i source_text zostaja polskie (kanoniczne)
@@ -125,7 +126,7 @@ def test_english_template_parser(api):
     response = api.client.post(
         "/api/chat/message",
         json={"user_id": api.uid, "message": "Date: 2026-06-14\nBreakfast\nCalories: 540\nCarbs: 48\nFat: 18\nProtein: 32"},
-        headers=EN,
+        headers=en(),
     )
     body = response.json()
     assert body["kind"] == "saved" and body["log_date"] == "2026-06-14"
@@ -134,24 +135,24 @@ def test_english_template_parser(api):
 
 def test_csv_in_english(api):
     api.chat("Waga: 82,4")
-    lines = api.client.get(f"/api/export?user_id={api.uid}", headers=EN).text.lstrip("﻿").splitlines()
+    lines = api.client.get(f"/api/export?user_id={api.uid}", headers=en()).text.lstrip("﻿").splitlines()
     assert lines[0] == "Date,Weight (kg),Waist (cm),Calories (kcal),Protein (g),Carbs (g),Fat (g)"
     assert lines[1] == "2026-06-15,82.4,,,,,"
-    template = api.client.get(f"/api/import/template?user_id={api.uid}", headers=EN).text.lstrip("﻿").splitlines()
+    template = api.client.get(f"/api/import/template?user_id={api.uid}", headers=en()).text.lstrip("﻿").splitlines()
     assert template[0] == lines[0]
     # import angielskiego pliku z kropka dziesietna
     content = "Date,Weight (kg),Calories (kcal)\n2026-06-01,91.5,2000\n"
-    result = api.client.post(f"/api/import?user_id={api.uid}", json={"content": content}, headers=EN).json()
+    result = api.client.post(f"/api/import?user_id={api.uid}", json={"content": content}, headers=en()).json()
     assert result["imported_days"] == 1
 
 
 def test_plan_message_in_english(api):
-    status = api.client.get(f"/api/profile/{api.uid}/plan", headers=EN).json()
+    status = api.client.get(f"/api/profile/{api.uid}/plan", headers=en()).json()
     assert status["message"].startswith("No weight measurements")
 
 
 def test_user_language_is_remembered(api, client):
-    assert client.put(f"/api/users/{api.uid}/language", json={"language": "en"}, headers=PIN).status_code == 200
-    session = client.post("/api/auth/verify", json={"user_id": api.uid, "pin": "1234"}).json()
+    assert client.put(f"/api/users/{api.uid}/language", json={"language": "en"}, headers=AUTH).status_code == 200
+    session = client.post("/api/auth/verify", json={"user_id": api.uid, "pin": TEST_PIN}).json()
     assert session["language"] == "en"
-    assert client.put(f"/api/users/{api.uid}/language", json={"language": "de"}, headers=PIN).status_code == 422
+    assert client.put(f"/api/users/{api.uid}/language", json={"language": "de"}, headers=AUTH).status_code == 422

@@ -140,6 +140,19 @@ def _migration_8_user_language(db: Session) -> None:
         db.execute(text("ALTER TABLE users ADD COLUMN language VARCHAR(8)"))
 
 
+def _migration_9_login_hardening(db: Session) -> None:
+    """T-PUB: wymuszona zmiana krotkiego PIN-u, licznik bledow od ostatniego logowania, czas ostatniego bledu."""
+    columns = _columns(db.connection(), "users")
+    if "pin_change_required" not in columns:
+        db.execute(text("ALTER TABLE users ADD COLUMN pin_change_required BOOLEAN NOT NULL DEFAULT 0"))
+    if "failed_since_login" not in columns:
+        db.execute(text("ALTER TABLE users ADD COLUMN failed_since_login INTEGER NOT NULL DEFAULT 0"))
+    if "last_failed_pin_at" not in columns:
+        db.execute(text("ALTER TABLE users ADD COLUMN last_failed_pin_at DATETIME"))
+    # stara semantyka (blokada co 5 bledow) nie przenosi sie na nowe progi
+    db.execute(text("UPDATE users SET failed_pin_attempts = 0, pin_locked_until = NULL"))
+
+
 MIGRATIONS = [
     (1, _migration_1_drop_day_status),
     (2, _migration_2_normalize_days),
@@ -149,6 +162,7 @@ MIGRATIONS = [
     (6, _migration_6_pin_lockout),
     (7, _migration_7_target_weight),
     (8, _migration_8_user_language),
+    (9, _migration_9_login_hardening),
 ]
 
 

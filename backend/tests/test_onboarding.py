@@ -1,6 +1,6 @@
 import sqlite3
 
-from .conftest import PIN, meal
+from .conftest import AUTH, TEST_PIN, auth_for, create_user, meal
 
 PROFILE = {
     "sex": "female",
@@ -26,8 +26,8 @@ def test_new_install_user_has_no_default_profile(fresh_api):
 
 
 def test_created_user_has_no_default_profile(client):
-    user = client.post("/api/users", json={"display_name": "Nowa Osoba", "pin": "2468"}).json()
-    profile = client.get(f"/api/profile/{user['id']}", headers={"X-User-PIN": "2468"}).json()
+    user = create_user(client, "Nowa Osoba")
+    profile = client.get(f"/api/profile/{user['id']}", headers=auth_for(client, user["id"])).json()
     assert profile["is_complete"] is False and profile["weight_kg"] is None
 
 
@@ -40,25 +40,25 @@ def test_data_endpoints_require_complete_profile(fresh_api):
         fresh_api.post(f"/api/days/{today}/entries", json={"entry_type": "weight", "weight_kg": 80}),
         fresh_api.get("/api/reports/summary"),
         fresh_api.get("/api/export"),
-        fresh_api.client.get(f"/api/profile/{fresh_api.uid}/plan", headers=PIN),
-        fresh_api.client.post("/api/chat/message", json={"user_id": fresh_api.uid, "message": meal()}, headers=PIN),
+        fresh_api.client.get(f"/api/profile/{fresh_api.uid}/plan", headers=AUTH),
+        fresh_api.client.post("/api/chat/message", json={"user_id": fresh_api.uid, "message": meal()}, headers=AUTH),
     ]
     for response in checks:
         assert response.status_code == 428, response.request.url
         assert "Uzupełnij profil" in response.json()["detail"]
     # PIN i usuniecie konta dzialaja bez profilu
-    assert fresh_api.client.post(f"/api/users/{fresh_api.uid}/pin", json={"new_pin": "1234"}, headers=PIN).status_code == 200
+    assert fresh_api.client.post(f"/api/users/{fresh_api.uid}/pin", json={"current_pin": TEST_PIN, "new_pin": "864209"}, headers=AUTH).status_code == 200
 
 
 def test_profile_requires_all_fields(fresh_api):
     for field in PROFILE:
         payload = {key: value for key, value in PROFILE.items() if key != field}
-        response = fresh_api.client.put(f"/api/profile/{fresh_api.uid}", json=payload, headers=PIN)
+        response = fresh_api.client.put(f"/api/profile/{fresh_api.uid}", json=payload, headers=AUTH)
         assert response.status_code == 422, field
 
 
 def test_completing_profile_unlocks_app(fresh_api):
-    response = fresh_api.client.put(f"/api/profile/{fresh_api.uid}", json=PROFILE, headers=PIN)
+    response = fresh_api.client.put(f"/api/profile/{fresh_api.uid}", json=PROFILE, headers=AUTH)
     assert response.status_code == 200
     profile = response.json()
     assert profile["is_complete"] is True and profile["sex"] == "female" and profile["weight_kg"] == 74.5
@@ -74,7 +74,7 @@ def test_migration_marks_never_saved_profiles_incomplete(client, fresh_api):
 
     from app.db import SessionLocal, _migration_4_profile_completion
 
-    other = client.post("/api/users", json={"display_name": "Zapisany Profil", "pin": "1357"}).json()
+    other = create_user(client, "Zapisany Profil")
     con = sqlite3.connect(os.environ["SQLITE_PATH"])
     con.execute(
         "INSERT INTO profiles (user_id, sex, age, height_cm, weight_kg, activity_level, goal_type, goal_delta_pct, daily_kcal_target, updated_at) "
@@ -92,16 +92,16 @@ def test_migration_marks_never_saved_profiles_incomplete(client, fresh_api):
         _migration_4_profile_completion(db)
         db.commit()
     assert fresh_api.profile()["is_complete"] is False
-    saved = client.get(f"/api/profile/{other['id']}", headers={"X-User-PIN": "1357"}).json()
+    saved = client.get(f"/api/profile/{other['id']}", headers=auth_for(client, other["id"])).json()
     assert saved["is_complete"] is True and saved["weight_kg"] == 70
 
 
 def test_profile_preview_shows_direction_of_goal(fresh_api):
     url = f"/api/profile/{fresh_api.uid}/preview"
     base = {**PROFILE, "sex": "male", "age": 30, "height_cm": 180, "weight_kg": 100, "activity_level": "moderate"}
-    cut = fresh_api.client.post(url, json={**base, "goal_type": "cut", "goal_delta_pct": 0.15}, headers=PIN).json()
-    bulk = fresh_api.client.post(url, json={**base, "goal_type": "bulk", "goal_delta_pct": 0.10}, headers=PIN).json()
-    keep = fresh_api.client.post(url, json={**base, "goal_type": "maintain", "goal_delta_pct": 0.0}, headers=PIN).json()
+    cut = fresh_api.client.post(url, json={**base, "goal_type": "cut", "goal_delta_pct": 0.15}, headers=AUTH).json()
+    bulk = fresh_api.client.post(url, json={**base, "goal_type": "bulk", "goal_delta_pct": 0.10}, headers=AUTH).json()
+    keep = fresh_api.client.post(url, json={**base, "goal_type": "maintain", "goal_delta_pct": 0.0}, headers=AUTH).json()
     assert cut["tdee_kcal"] == bulk["tdee_kcal"] == keep["tdee_kcal"] == 3069
     assert cut["delta_kcal"] < 0 and cut["target_kcal"] == round(3069 * 0.85)
     assert bulk["delta_kcal"] > 0 and bulk["target_kcal"] == round(3069 * 1.10)

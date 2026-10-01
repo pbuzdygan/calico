@@ -1,4 +1,4 @@
-import { lockUser } from "./auth.js";
+import { lockUser, openForcedPinChange } from "./auth.js";
 import { API_BASE, FIELD_LABELS } from "./config.js";
 import { lang, t } from "./i18n.js";
 import { openOnboarding } from "./profile-form.js";
@@ -35,7 +35,11 @@ export async function fetchJSON(url, options = {}) {
     payload = null;
   }
   if (!response.ok) {
-    if (response.status === 428 && state.token) openOnboarding();
+    if (response.status === 428 && state.token) {
+      // T-PUB: najpierw zmiana zbyt krótkiego PIN-u, potem profil (D8)
+      if (payload?.code === "pin_change_required") openForcedPinChange();
+      else openOnboarding();
+    }
     if (response.status === 401 && state.token) {
       lockUser(t("PIN został zmieniony albo sesja wygasła. Odblokuj ponownie."));
     }

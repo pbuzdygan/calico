@@ -1,7 +1,7 @@
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 EntryType = Literal["weight", "waist", "breakfast", "lunch", "dinner", "snack", "daily_balance"]
 ChatKind = Literal["saved", "info", "error"]
@@ -9,7 +9,8 @@ ChatKind = Literal["saved", "info", "error"]
 
 class UserCreate(BaseModel):
     display_name: str = Field(min_length=2, max_length=128)
-    pin: str = Field(pattern=r"^\d{4,8}$")
+    pin: str = Field(pattern=r"^\d{4,8}$")  # dokladna polityka (PIN_MIN_LENGTH, trywialne PIN-y): services.check_new_pin
+    setup_code: str | None = Field(default=None, max_length=32)  # wymagany tylko dla pierwszego konta (T-PUB)
 
 
 class UserOut(BaseModel):
@@ -22,6 +23,7 @@ class UserOut(BaseModel):
 
 
 class PinChangeIn(BaseModel):
+    current_pin: str = Field(max_length=8)
     new_pin: str = Field(pattern=r"^\d{4,8}$")
 
 
@@ -147,8 +149,19 @@ class ChatMessageIn(BaseModel):
 
 
 class AuthVerifyIn(BaseModel):
-    user_id: int
+    """Logowanie: user_id (lista uzytkownikow) albo name (SHOW_USER_LIST=false)."""
+
+    user_id: int | None = None
+    name: str | None = Field(default=None, max_length=128)
     pin: str = Field(pattern=r"^\d{4,8}$")
+    # tokeny zaufanych urzadzen zapamietane w przegladarce (T-PUB); serwer wybiera pasujacy do konta
+    device_tokens: list[Annotated[str, Field(max_length=512)]] = Field(default_factory=list, max_length=10)
+
+    @model_validator(mode="after")
+    def _user_or_name(self):
+        if self.user_id is None and not (self.name or "").strip():
+            raise ValueError("user_id or name is required")
+        return self
 
 
 Language = Literal["pl", "en"]
@@ -159,6 +172,11 @@ class AuthVerifyOut(BaseModel):
     token: str | None = None
     expires_at: datetime | None = None
     language: Language | None = None  # zapamietany jezyk uzytkownika (None = jezyk urzadzenia)
+    user_id: int | None = None
+    display_name: str | None = None
+    device_token: str | None = None  # T-PUB: zaufane urzadzenie (localStorage), wysylane przy kolejnych logowaniach
+    pin_change_required: bool = False  # T-PUB: PIN krotszy niz PIN_MIN_LENGTH - najpierw zmiana PIN-u
+    failed_attempts: int = 0  # nieudane proby logowania od ostatniego udanego logowania
 
 
 class LanguageIn(BaseModel):

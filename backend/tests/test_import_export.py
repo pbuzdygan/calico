@@ -1,6 +1,6 @@
 """T-IO (D11): eksport i import w formacie "wiersz = dzien", szablon do pobrania, pomijanie zajetych dni."""
 
-from .conftest import complete_profile_directly, meal
+from .conftest import auth_for, complete_profile_directly, create_user, meal
 
 HEADER = "Data;Waga (kg);Obwód pasa (cm);Kalorie (kcal);Białko (g);Węglowodany (g);Tłuszcze (g)"
 
@@ -47,9 +47,9 @@ def test_export_import_roundtrip(api, client):
     exported = api.get("/api/export").text
     assert "2026-06-08;;;1900;;;" in exported.splitlines()
 
-    other = client.post("/api/users", json={"display_name": "Kopia", "pin": "2468"}).json()
+    other = create_user(client, "Kopia")
     complete_profile_directly(other["id"])
-    copy_headers = {"X-User-PIN": "2468"}
+    copy_headers = auth_for(client, other["id"])
     response = client.post(f"/api/import?user_id={other['id']}", json={"content": exported}, headers=copy_headers)
     assert response.json()["imported_days"] == 3
     reexported = client.get(f"/api/export?user_id={other['id']}", headers=copy_headers).text

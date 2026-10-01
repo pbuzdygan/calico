@@ -406,6 +406,11 @@ input[type="date"] {
   gap: 8px;
 }
 
+.stack-form {
+  display: grid;
+  gap: 8px;
+}
+
 .inline-form input {
   flex: 1;
   min-width: 0;
@@ -1777,6 +1782,10 @@ button.card:hover {
 .toast.error {
   border-color: rgba(255, 104, 124, 0.5);
   background: rgba(46, 18, 30, 0.97);
+}
+
+.toast.warning {
+  border-color: var(--warning);
 }
 
 .toast-close {

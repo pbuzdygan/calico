@@ -7,9 +7,14 @@ All notable changes to CALICO are listed here, newest first, described from the 
 ### New Features
 
 - **Ready-made images for your server.** CALICO is now published as a container image for regular PCs and servers (amd64) and for ARM devices such as a Raspberry Pi 4 or 5 (arm64). You no longer have to build it yourself: download the compose file, run one command, and upgrade later with `docker compose pull`. Choose a stable version, or the development channel if you want to try new things early.
+- **Sign in with your name instead of picking from a list.** The owner can hide the list of users on the login screen, so strangers can't see who has an account. Your device remembers the name you typed last – never your PIN.
+- **Know when someone tried to get in.** After you sign in, CALICO tells you how many failed attempts there were on your account since your last visit.
 
 ### Improvements
 
+- **Much harder to guess your PIN.** New PINs have at least 6 digits and obvious ones like 123456 or 111111 are refused. If your PIN is shorter, CALICO asks you to set a new one right after you sign in. Changing your PIN now requires your current PIN, so someone who finds your phone unlocked can't take over your account.
+- **Nobody can lock you out.** Wrong PINs typed by someone else no longer lock your account for you: they lock out the person guessing, and the browsers you have signed in with before always keep working.
+- **A freshly installed CALICO can't be claimed by strangers.** Creating the first account needs a one-time code that only the person running the server can see in its logs.
 - **Safer to run on your network or the internet.** The server components were updated to fix known security issues. The app now refuses oversized requests, sends stricter browser security rules and reveals less about itself. The container runs with the minimum permissions it needs, so even a flaw in the app could not change its own files.
 - **Choose which user the app runs as.** Set `PUID` and `PGID` to your own user and group, and the app's data files get the same owner as the rest of your files – no more permission problems when you keep the data in a folder on your server.
 - **Clearer setup.** Every setting in the example configuration file is explained in plain words, with recommendations for instances reachable from the internet. Settings that did nothing have been removed.

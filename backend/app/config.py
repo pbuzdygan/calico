@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +13,10 @@ class Settings(BaseSettings):
     # Pusty = sekret generowany automatycznie i zapisany w bazie (app_meta.session_secret).
     session_secret: str = ""
     session_ttl_hours: int = 12
+    # T-PUB: minimalna dlugosc nowego PIN-u (4-8); krotszy PIN istniejacego konta wymusza zmiane po zalogowaniu.
+    pin_min_length: int = Field(default=6, ge=4, le=8)
+    # T-PUB: false = ekran logowania bez listy uzytkownikow (logowanie nazwa + PIN-em).
+    show_user_list: bool = True
     # Interaktywna dokumentacja API (/docs, /redoc, /openapi.json) - domyslnie wylaczona (publiczny obraz).
     api_docs: bool = False
     # Maks. rozmiar tresci zadania; import CSV (1 000 000 znakow) musi sie zmiescic.

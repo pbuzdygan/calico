@@ -1,5 +1,5 @@
 import { api, fetchJSON, profileApi, saveSession, userHeaders } from "../api.js";
-import { loadUsers, lockUser } from "../auth.js";
+import { loadUsers, lockUser, loginMeta, pinRuleText } from "../auth.js";
 import { API_BASE } from "../config.js";
 import { N_, t } from "../i18n.js";
 import { openOnboarding, updateGoalDeltaUi } from "../profile-form.js";
@@ -93,23 +93,29 @@ el.profileForm.addEventListener("submit", async (event) => {
 
 el.pinChangeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const currentPin = el.currentPinInput.value.trim();
   const newPin = el.newPinInput.value.trim();
-  if (!/^\d{4,8}$/.test(newPin)) {
-    toast(t("Nowy PIN musi mieć 4–8 cyfr."), "error");
+  if (!/^\d{4,8}$/.test(currentPin)) {
+    toast(t("Podaj obecny PIN."), "error");
+    el.currentPinInput.focus();
+    return;
+  }
+  if (!new RegExp(`^\\d{${loginMeta.pinMinLength},8}$`).test(newPin)) {
+    toast(pinRuleText(), "error");
     return;
   }
   try {
     await withBusy(event.submitter, async () => {
+      // Zmiana PIN-u wymaga obecnego PIN-u (przejęta sesja nie wystarczy) i unieważnia stare tokeny - serwer zwraca nowy.
       const changed = await fetchJSON(`${API_BASE}/users/${state.userId}/pin`, {
         method: "POST",
         headers: userHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ new_pin: newPin }),
+        body: JSON.stringify({ current_pin: currentPin, new_pin: newPin }),
       });
-      // Zmiana PIN-u unieważnia stare tokeny - serwer zwraca nowy.
       state.token = changed.token;
       state.tokenExpiresAt = changed.expires_at;
       saveSession();
-      el.newPinInput.value = "";
+      el.pinChangeForm.reset();
       toast(t("PIN został zmieniony."), "success");
     });
   } catch (error) {

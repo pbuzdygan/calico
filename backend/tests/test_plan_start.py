@@ -2,14 +2,14 @@
 
 from datetime import date, timedelta
 
-from .conftest import PIN
+from .conftest import AUTH
 from .test_plan import PLAN_START, plan_status, set_today, start_cut_plan
 
 HEADER = "Data;Waga (kg);Obwód pasa (cm);Kalorie (kcal);Białko (g);Węglowodany (g);Tłuszcze (g)"
 
 
 def set_plan_start(api, value):
-    return api.client.put(f"/api/profile/{api.uid}/plan-start", json={"plan_started_on": value}, headers=PIN)
+    return api.client.put(f"/api/profile/{api.uid}/plan-start", json={"plan_started_on": value}, headers=AUTH)
 
 
 def history_csv(start: date, days: int, start_weight: float, rate_per_week: float, every: int = 2) -> str:
@@ -69,7 +69,7 @@ def test_forecast_uses_recent_measurements_even_before_plan_start(api, frozen_cl
     start_cut_plan(api, frozen_clock)
     set_today(frozen_clock, PLAN_START + timedelta(days=1))
     import_csv(api, history_csv(PLAN_START - timedelta(days=27), 26, start_weight=102, rate_per_week=-0.5))
-    api.client.put(f"/api/profile/{api.uid}/target-weight", json={"target_weight_kg": 95}, headers=PIN)
+    api.client.put(f"/api/profile/{api.uid}/target-weight", json={"target_weight_kg": 95}, headers=AUTH)
     status = plan_status(api)
     assert status["observed_rate_kg_per_week"] is None  # ocena planu: za malo danych od startu planu
     assert status["forecast_basis"] == "trend"

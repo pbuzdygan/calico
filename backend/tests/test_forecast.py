@@ -2,12 +2,12 @@
 
 from datetime import date, timedelta
 
-from .conftest import PIN
+from .conftest import AUTH
 from .test_plan import PLAN_START, log_weights, plan_status, set_today, start_cut_plan
 
 
 def set_target_weight(api, value):
-    response = api.client.put(f"/api/profile/{api.uid}/target-weight", json={"target_weight_kg": value}, headers=PIN)
+    response = api.client.put(f"/api/profile/{api.uid}/target-weight", json={"target_weight_kg": value}, headers=AUTH)
     return response
 
 

@@ -29,13 +29,13 @@ Kluczowe decyzje produktowe (nie zmieniaj bez zgody właściciela):
 - **D2b: aktualna waga ≠ automatyczna zmiana celu.** Cel kcal to plan zmieniany tylko jawnie (zapis profilu albo akceptacja sugestii z `app/plan.py`). Wpisy `Waga` służą do monitorowania trendu. Nie dodawaj automatycznego przeliczania celu po ważeniu („spirala deficytu”),
 - zmiana celu aktualizuje cel dziś i w przyszłych dniach, nie w przeszłych (D3),
 - **D8: profil bez wartości domyślnych, uzupełnienie wymuszone przy pierwszym logowaniu.** Nowe endpointy danych muszą używać zależności `profiled_user` (428 bez profilu), a nie `current_user`,
-- uwierzytelnienie: `authenticate()` w `main.py` (token `Authorization: Bearer` albo `X-User-PIN`); frontend wysyła wyłącznie token (`userHeaders()`), sesja w `sessionStorage` (`calico.session`) – nigdy nie zapisuj PIN-u w przeglądarce,
+- uwierzytelnienie: `authenticate()` w `main.py` – wyłącznie token `Authorization: Bearer`; PIN przyjmuje tylko `POST /api/auth/verify` (`services.login`, limity w `app/login_guard.py`) i zmiana PIN-u (`current_pin`). Nie dodawaj endpointów przyjmujących PIN. Zależności: `profiled_user` (dane) → `current_user` (428 `pin_change_required` przy zbyt krótkim PIN-ie) → `session_user` (tylko zmiana PIN-u i języka). Frontend: sesja w `sessionStorage` (`calico.session`), token zaufanego urządzenia i ostatnia nazwa w `localStorage` (`calico.devices`, `calico.lastUser`) – nigdy nie zapisuj PIN-u w przeglądarce,
 - polskie znaki w UI i szablonach (D4); parser akceptuje też zapis bez nich,
 - **D12: aplikacja dwujęzyczna PL/EN.** Polski jest językiem źródłowym, angielski to słownik. Każdy nowy tekst od razu w obu językach (zasady w „Zasady pracy”),
 - wpisy maks. na jutro, nie wcześniej niż 2000-01-01 (D5),
 - **D6: dom (LAN) i internet.** Obraz jest publiczny i może być wystawiony do internetu za reverse proxy z TLS. Zabezpieczenia nie mogą zakładać zaufanej sieci; wygody dla domu tylko jako przełączniki w `.env` z zaleceniem dla instancji publicznej,
 - **D9: brak trybu administratora i logów diagnostycznych** – usunięte w całości; nie przywracaj bez zgody właściciela.
-- **D10: brak użytkownika i PIN-u domyślnego.** Pierwszy start = ekran „Utwórz użytkownika”; nie dodawaj bootstrapu konta ani `DEFAULT_USER_PIN`.
+- **D10: brak użytkownika i PIN-u domyślnego.** Pierwszy start = ekran „Utwórz użytkownika” z kodem pierwszego uruchomienia z logów kontenera; nie dodawaj bootstrapu konta ani `DEFAULT_USER_PIN`.
 
 ## Uruchamianie
 

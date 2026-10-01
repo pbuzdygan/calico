@@ -1,4 +1,4 @@
-from .conftest import PIN, meal
+from .conftest import AUTH, TEST_PIN, auth_for, complete_profile_directly, create_user, meal
 
 TODAY = "2026-06-15"
 
@@ -177,12 +177,10 @@ def test_clear_day_and_days_list(api):
 def test_wrong_pin_and_other_users_entries(client, api):
     api.chat(meal())
     entry_id = api.day(TODAY)["entries"][0]["id"]
-    assert client.get(f"/api/days/{TODAY}?user_id={api.uid}", headers={"X-User-PIN": "0000"}).status_code == 401
-    other = client.post("/api/users", json={"display_name": "Druga Osoba", "pin": "5555"}).json()
-    from .conftest import complete_profile_directly
-
+    assert client.get(f"/api/days/{TODAY}?user_id={api.uid}", headers={"Authorization": "Bearer zly"}).status_code == 401
+    other = create_user(client, "Druga Osoba", "975310")
     complete_profile_directly(other["id"])
-    response = client.delete(f"/api/days/{TODAY}/entries/{entry_id}?user_id={other['id']}", headers={"X-User-PIN": "5555"})
+    response = client.delete(f"/api/days/{TODAY}/entries/{entry_id}?user_id={other['id']}", headers=auth_for(client, other["id"], "975310"))
     assert response.status_code == 404
     assert len(api.day(TODAY)["entries"]) == 1
 
@@ -198,11 +196,11 @@ def test_timezone_today(api, frozen_clock):
 
 
 def test_change_pin_and_delete_user(client, api):
-    response = client.post(f"/api/users/{api.uid}/pin", json={"new_pin": "987654"}, headers=PIN)
+    response = client.post(f"/api/users/{api.uid}/pin", json={"current_pin": TEST_PIN, "new_pin": "987650"}, headers=AUTH)
     assert response.status_code == 200
-    assert client.post("/api/auth/verify", json={"user_id": api.uid, "pin": "1234"}).status_code == 401
-    assert client.post("/api/auth/verify", json={"user_id": api.uid, "pin": "987654"}).status_code == 200
-    assert client.delete(f"/api/users/{api.uid}", headers={"X-User-PIN": "987654"}).status_code == 200
+    assert client.post("/api/auth/verify", json={"user_id": api.uid, "pin": TEST_PIN}).status_code == 401
+    new_headers = auth_for(client, api.uid, "987650")
+    assert client.delete(f"/api/users/{api.uid}", headers=new_headers).status_code == 200
     assert client.get("/api/users").json() == []
 
 

@@ -1,3 +1,4 @@
+import logging
 import mimetypes
 from contextlib import asynccontextmanager
 from datetime import date
@@ -48,9 +49,25 @@ mimetypes.add_type("font/woff2", ".woff2")
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 
+log = logging.getLogger("uvicorn.error")
+
+
+def _announce_setup_code() -> None:
+    """T-PUB: swieza instalacja - kod do utworzenia pierwszego konta trafia do logow kontenera."""
+    with SessionLocal() as db:
+        code = services.ensure_setup_code(db)
+        db.commit()
+    if code:
+        log.warning("=" * 64)
+        log.warning("CALICO first start - no users yet.")
+        log.warning("Setup code for creating the first user: %s", code)
+        log.warning("=" * 64)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
+    _announce_setup_code()
     yield
 
 
@@ -123,6 +140,16 @@ async def pin_locked_handler(_request: Request, exc: services.PinLockedError):
     )
 
 
+@app.exception_handler(services.WrongPinError)
+async def wrong_pin_handler(_request: Request, exc: services.WrongPinError):
+    return JSONResponse(status_code=401, content={"detail": str(exc)})
+
+
+@app.exception_handler(services.PinChangeRequiredError)
+async def pin_change_required_handler(_request: Request, exc: services.PinChangeRequiredError):
+    return JSONResponse(status_code=428, content={"detail": str(exc), "code": "pin_change_required"})
+
+
 @app.exception_handler(services.NotFoundError)
 async def not_found_handler(_request: Request, exc: services.NotFoundError):
     return JSONResponse(status_code=404, content={"detail": str(exc)})
@@ -142,55 +169,46 @@ def get_db():
 
 
 
-def _check_pin(db: Session, user_id: int, pin: str) -> User | None:
-    user = services.require_user_pin(db, user_id, pin)
-    if user is None:
-        db.commit()  # licznik blednych prob musi przetrwac odpowiedz 401 (get_db robi rollback przy wyjatku)
-    return user
+def client_ip(request: Request) -> str:
+    """Adres klienta; za reverse proxy prawdziwy tylko przy FORWARDED_ALLOW_IPS (uvicorn --proxy-headers)."""
+    return request.client.host if request.client else "unknown"
 
 
-def _wrong_pin_detail(db: Session, user_id: int) -> str:
-    user = db.get(User, user_id)
-    if user is None:
-        return t("Niepoprawny PIN.")
-    if user.pin_locked_until and user.pin_locked_until > clock.utcnow_naive():  # ta proba zalozyla blokade
-        locked = services.PinLockedError(int((user.pin_locked_until - clock.utcnow_naive()).total_seconds()))
-        return f"{t('Niepoprawny PIN.')} {locked}"
-    return t("Niepoprawny PIN. Pozostałe próby: {left}.", left=services.pin_attempts_left(user))
-
-
-def authenticate(db: Session, user_id: int, x_user_pin: str | None, authorization: str | None) -> User:
-    """Token sesji (Authorization: Bearer) albo PIN (X-User-PIN). Token nie wymaga liczenia PBKDF2."""
+def authenticate(db: Session, user_id: int, authorization: str | None) -> User:
+    """Tylko token sesji (Authorization: Bearer). PIN jest przyjmowany wylacznie przez POST /api/auth/verify (T-PUB)."""
     user = None
     if authorization and authorization.lower().startswith("bearer "):
         user = services.user_from_session(db, user_id, authorization[7:].strip())
-    elif x_user_pin:
-        user = _check_pin(db, user_id, x_user_pin)
     if not user:
-        raise HTTPException(status_code=401, detail=t("Sesja wygasła albo PIN jest niepoprawny – odblokuj ponownie."))
+        raise HTTPException(status_code=401, detail=t("Sesja wygasła – odblokuj ponownie PIN-em."))
     return user
 
 
-def current_user(
-    user_id: int,
-    db: Session = Depends(get_db),
-    x_user_pin: str | None = Header(None, alias="X-User-PIN"),
-    authorization: str | None = Header(None),
-) -> User:
-    """user_id pochodzi ze sciezki (/users/{user_id}) albo z query (?user_id=)."""
-    return authenticate(db, user_id, x_user_pin, authorization)
+def session_user(user_id: int, db: Session = Depends(get_db), authorization: str | None = Header(None)) -> User:
+    """Zalogowany uzytkownik bez dalszych warunkow - tylko zmiana PIN-u i jezyka. user_id ze sciezki albo z query."""
+    return authenticate(db, user_id, authorization)
 
 
-def _profile_required() -> HTTPException:
-    return HTTPException(
-        status_code=428, detail=t("Uzupełnij profil (płeć, wiek, wzrost, waga, aktywność, cel) – bez niego CALICO nie może wyliczyć planu.")
-    )
+def current_user(user: User = Depends(session_user)) -> User:
+    """Zalogowany uzytkownik z aktualnym PIN-em (krotki PIN = 428 code=pin_change_required)."""
+    services.require_pin_current(user)
+    return user
+
+
+class _ProfileRequired(Exception):
+    pass
+
+
+@app.exception_handler(_ProfileRequired)
+async def profile_required_handler(_request: Request, _exc: _ProfileRequired):
+    detail = t("Uzupełnij profil (płeć, wiek, wzrost, waga, aktywność, cel) – bez niego CALICO nie może wyliczyć planu.")
+    return JSONResponse(status_code=428, content={"detail": detail, "code": "profile_required"})
 
 
 def profiled_user(user: User = Depends(current_user), db: Session = Depends(get_db)) -> User:
     """Uzytkownik z uzupelnionym profilem - wymagane dla wszystkich danych dziennika, raportow i planu."""
     if not services.is_profile_complete(db, user.id):
-        raise _profile_required()
+        raise _ProfileRequired()
     return user
 
 
@@ -204,7 +222,14 @@ def health():
 
 @app.get("/api/meta")
 def api_meta(db: Session = Depends(get_db)):
-    return {"today": clock.today(), "timezone": settings.app_timezone, "allow_signup": services.signup_allowed(db)}
+    return {
+        "today": clock.today(),
+        "timezone": settings.app_timezone,
+        "allow_signup": services.signup_allowed(db),
+        "setup_required": not services.has_users(db),
+        "show_user_list": settings.show_user_list,
+        "pin_min_length": settings.pin_min_length,
+    }
 
 
 # --- uzytkownicy i profil -------------------------------------------------------
@@ -212,12 +237,14 @@ def api_meta(db: Session = Depends(get_db)):
 
 @app.get("/api/users", response_model=list[UserOut])
 def api_list_users(db: Session = Depends(get_db)):
+    if not settings.show_user_list:
+        raise services.ForbiddenError(t("Lista użytkowników jest ukryta – zaloguj się nazwą i PIN-em."))
     return services.list_users(db)
 
 
 @app.post("/api/users", response_model=UserOut)
-def api_create_user(payload: UserCreate, db: Session = Depends(get_db)):
-    return services.create_user(db, payload.display_name, payload.pin)
+def api_create_user(payload: UserCreate, request: Request, db: Session = Depends(get_db)):
+    return services.create_user(db, payload.display_name, payload.pin, payload.setup_code, client_ip(request))
 
 
 @app.delete("/api/users/{user_id}", response_model=AuthVerifyOut)
@@ -227,25 +254,39 @@ def api_delete_user(user: User = Depends(current_user), db: Session = Depends(ge
 
 
 @app.post("/api/users/{user_id}/pin", response_model=AuthVerifyOut)
-def api_change_pin(payload: PinChangeIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    services.change_user_pin(db, user, payload.new_pin)
+def api_change_pin(payload: PinChangeIn, request: Request, user: User = Depends(session_user), db: Session = Depends(get_db)):
+    services.change_user_pin(db, user, payload.current_pin, payload.new_pin, client_ip(request))
     token, expires_at = services.issue_session(db, user)  # stare tokeny przestaja dzialac
-    return AuthVerifyOut(ok=True, token=token, expires_at=expires_at, language=user.language)
+    return AuthVerifyOut(ok=True, token=token, expires_at=expires_at, language=user.language, user_id=user.id, display_name=user.display_name)
 
 
 @app.put("/api/users/{user_id}/language", response_model=LanguageIn)
-def api_set_language(payload: LanguageIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def api_set_language(payload: LanguageIn, user: User = Depends(session_user), db: Session = Depends(get_db)):
     services.set_user_language(db, user, payload.language)
     return payload
 
 
 @app.post("/api/auth/verify", response_model=AuthVerifyOut)
-def api_verify_auth(payload: AuthVerifyIn, db: Session = Depends(get_db)):
-    user = _check_pin(db, payload.user_id, payload.pin)
-    if not user:
-        raise HTTPException(status_code=401, detail=_wrong_pin_detail(db, payload.user_id))
-    token, expires_at = services.issue_session(db, user)
-    return AuthVerifyOut(ok=True, token=token, expires_at=expires_at, language=user.language)
+def api_verify_auth(payload: AuthVerifyIn, request: Request, db: Session = Depends(get_db)):
+    try:
+        result = services.login(
+            db, user_id=payload.user_id, name=payload.name, pin=payload.pin, ip=client_ip(request), device_tokens=payload.device_tokens
+        )
+    except services.WrongPinError:
+        db.commit()  # licznik blednych prob konta musi przetrwac odpowiedz 401 (get_db robi rollback przy wyjatku)
+        raise
+    user = result.user
+    return AuthVerifyOut(
+        ok=True,
+        token=result.token,
+        expires_at=result.expires_at,
+        language=user.language,
+        user_id=user.id,
+        display_name=user.display_name,
+        device_token=result.device_token,
+        pin_change_required=user.pin_change_required,
+        failed_attempts=result.failed_attempts,
+    )
 
 
 def _profile_out(db: Session, user_id: int) -> ProfileOut:
@@ -471,15 +512,11 @@ def api_import(payload: ImportIn, user: User = Depends(profiled_user), db: Sessi
 
 
 @app.post("/api/chat/message", response_model=ChatResponseOut)
-def api_chat_message(
-    payload: ChatMessageIn,
-    db: Session = Depends(get_db),
-    x_user_pin: str | None = Header(None, alias="X-User-PIN"),
-    authorization: str | None = Header(None),
-):
-    user = authenticate(db, payload.user_id, x_user_pin, authorization)
+def api_chat_message(payload: ChatMessageIn, db: Session = Depends(get_db), authorization: str | None = Header(None)):
+    user = authenticate(db, payload.user_id, authorization)
+    services.require_pin_current(user)
     if not services.is_profile_complete(db, user.id):
-        raise _profile_required()
+        raise _ProfileRequired()
 
     result = services.handle_chat_message(db, user.id, payload.message)
     totals = services.day_totals_out(db, user.id, result.log_date)

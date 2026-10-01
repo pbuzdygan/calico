@@ -25,6 +25,12 @@ class User(Base):
     # T3.1: blokada po blednych PIN-ach (services.PIN_*).
     failed_pin_attempts: Mapped[int] = mapped_column(Integer, default=0)
     pin_locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # T-PUB (migracja 9): PIN krotszy niz PIN_MIN_LENGTH - zmiana wymuszona po zalogowaniu;
+    # failed_pin_attempts = licznik eskalacji blokady konta (zerowany po ACCOUNT_FORGET_DAYS bez bledow, nie przy logowaniu),
+    # failed_since_login = bledy od ostatniego udanego logowania (komunikat dla uzytkownika).
+    pin_change_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    failed_since_login: Mapped[int] = mapped_column(Integer, default=0)
+    last_failed_pin_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Jezyk interfejsu wybrany przez uzytkownika ("pl"/"en"); NULL = jezyk urzadzenia.
     language: Mapped[str | None] = mapped_column(String(8), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)

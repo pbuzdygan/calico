@@ -12,11 +12,14 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app import clock  # noqa: E402
 from app.db import Base, engine  # noqa: E402
+from app.login_guard import guard  # noqa: E402
 from app.main import app  # noqa: E402
 
 # 2026-06-15 12:00 czasu polskiego
 FROZEN_NOW = datetime(2026, 6, 15, 10, 0, tzinfo=UTC)
-PIN = {"X-User-PIN": "1234"}
+TEST_PIN = "135790"
+# Naglowek Authorization zalogowanego uzytkownika testowego (uzupelnia fixture uid). PIN dziala tylko w /api/auth/verify.
+AUTH: dict[str, str] = {}
 
 
 @pytest.fixture(autouse=True)
@@ -33,12 +36,62 @@ def client():
         yield test_client
 
 
+@pytest.fixture(autouse=True)
+def reset_login_guard():
+    guard.reset()  # limity logowania w pamieci procesu - kazdy test od zera
+    yield
+    guard.reset()
+
+
+def setup_code():
+    """Kod pierwszego uruchomienia (T-PUB) - None, gdy konta juz istnieja."""
+    from app import services
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        code = services.ensure_setup_code(db)
+        db.commit()
+    return code
+
+
+def create_user(client, display_name, pin=TEST_PIN):
+    payload = {"display_name": display_name, "pin": pin}
+    code = setup_code()
+    if code:
+        payload["setup_code"] = code
+    response = client.post("/api/users", json=payload)
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def login(client, user_id, pin=TEST_PIN, **extra):
+    response = client.post("/api/auth/verify", json={"user_id": user_id, "pin": pin, **extra})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def bearer(token):
+    return {"Authorization": f"Bearer {token}"}
+
+
+def auth_for(client, user_id, pin=TEST_PIN):
+    return bearer(login(client, user_id, pin)["token"])
+
+
 @pytest.fixture
 def uid(client):
-    # D10: brak uzytkownika domyslnego - pierwszy uzytkownik zakladany jawnie
-    response = client.post("/api/users", json={"display_name": "Test", "pin": "1234"})
-    assert response.status_code == 200, response.text
-    return response.json()["id"]
+    # D10: brak uzytkownika domyslnego - pierwszy uzytkownik zakladany jawnie (z kodem pierwszego uruchomienia)
+    from app.config import settings
+
+    user = create_user(client, "Test")
+    ttl = settings.session_ttl_hours
+    settings.session_ttl_hours = 24 * 3650  # testy przesuwaja zegar o dni - sesja testowa nie wygasa
+    try:
+        AUTH.clear()
+        AUTH.update(auth_for(client, user["id"]))
+    finally:
+        settings.session_ttl_hours = ttl
+    return user["id"]
 
 
 class Api:
@@ -47,25 +100,25 @@ class Api:
         self.uid = uid
 
     def chat(self, message):
-        response = self.client.post("/api/chat/message", json={"user_id": self.uid, "message": message}, headers=PIN)
+        response = self.client.post("/api/chat/message", json={"user_id": self.uid, "message": message}, headers=AUTH)
         assert response.status_code == 200, response.text
         return response.json()
 
     def get(self, path, **params):
         params.setdefault("user_id", self.uid)
-        return self.client.get(path, params=params, headers=PIN)
+        return self.client.get(path, params=params, headers=AUTH)
 
     def post(self, path, json=None, **params):
         params.setdefault("user_id", self.uid)
-        return self.client.post(path, params=params, json=json, headers=PIN)
+        return self.client.post(path, params=params, json=json, headers=AUTH)
 
     def patch(self, path, json=None, **params):
         params.setdefault("user_id", self.uid)
-        return self.client.patch(path, params=params, json=json, headers=PIN)
+        return self.client.patch(path, params=params, json=json, headers=AUTH)
 
     def delete(self, path, **params):
         params.setdefault("user_id", self.uid)
-        return self.client.delete(path, params=params, headers=PIN)
+        return self.client.delete(path, params=params, headers=AUTH)
 
     def day(self, log_date):
         response = self.get(f"/api/days/{log_date}")
@@ -73,7 +126,7 @@ class Api:
         return response.json()
 
     def profile(self):
-        return self.client.get(f"/api/profile/{self.uid}", headers=PIN).json()
+        return self.client.get(f"/api/profile/{self.uid}", headers=AUTH).json()
 
     def put_profile(self, **overrides):
         payload = {
@@ -86,7 +139,7 @@ class Api:
             "goal_delta_pct": 0.0,
         }
         payload.update(overrides)
-        response = self.client.put(f"/api/profile/{self.uid}", json=payload, headers=PIN)
+        response = self.client.put(f"/api/profile/{self.uid}", json=payload, headers=AUTH)
         assert response.status_code == 200, response.text
         return response.json()
 

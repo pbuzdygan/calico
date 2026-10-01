@@ -69,20 +69,25 @@
           <img src="/icons/banner-720.jpg" srcset="/icons/banner-720.jpg 720w, /icons/banner-1200.jpg 1200w" width="1219" height="453" sizes="(min-width: 560px) 520px, calc(100vw - 32px)" alt="CALICO – świadome nawyki, realne efekty" fetchpriority="high" />
         </h1>
         <form id="unlockForm" class="lock-form">
-          <div class="field">
+          <div id="userSelectField" class="field">
             <label for="userSelect">Użytkownik</label>
             <select id="userSelect"></select>
           </div>
+          <!-- SHOW_USER_LIST=false: zamiast listy nazwa użytkownika (urządzenie pamięta ostatnią, nigdy PIN) -->
+          <div id="loginNameField" class="field" hidden>
+            <label for="loginNameInput">Nazwa użytkownika</label>
+            <input id="loginNameInput" maxlength="128" autocomplete="username" autocapitalize="off" spellcheck="false" />
+          </div>
           <div class="field">
             <label for="pinInput">PIN</label>
-            <input id="pinInput" class="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="••••" autocomplete="current-password" />
+            <input id="pinInput" class="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="••••••" autocomplete="current-password" />
           </div>
           <button id="unlockBtn" class="btn btn-primary" type="submit">Odblokuj</button>
           <p id="authStatus" class="form-status" aria-live="polite"></p>
         </form>
         <!-- Pierwszy start (D10): brak użytkownika domyślnego, pierwszy zakładany jawnie -->
         <div id="firstRun" class="lock-form" hidden>
-          <p class="hint">Witaj w CALICO. Utwórz pierwszego użytkownika – wybierz nazwę i PIN, którym będziesz odblokowywać aplikację.</p>
+          <p class="hint">Witaj w CALICO. Utwórz pierwszego użytkownika – wybierz nazwę i PIN, którym będziesz odblokowywać aplikację. Potrzebny będzie kod pierwszego uruchomienia z logów kontenera.</p>
           <button id="firstRunBtn" class="btn btn-primary" type="button"><svg class="icon"><use href="#i-user" /></svg>Utwórz użytkownika</button>
         </div>
         <div id="lockLinks" class="lock-links">
@@ -454,9 +459,13 @@
             <div class="more-side">
               <article class="card">
                 <div class="card-head"><h2 class="card-title"><svg class="icon"><use href="#i-key" /></svg>Zmiana PIN-u</h2></div>
-                <form id="pinChangeForm" class="inline-form">
-                  <input id="newPinInput" type="password" inputmode="numeric" maxlength="8" placeholder="Nowy PIN (4–8 cyfr)" autocomplete="new-password" aria-label="Nowy PIN" />
-                  <button class="btn btn-quiet" type="submit">Zmień</button>
+                <form id="pinChangeForm" class="stack-form">
+                  <input id="currentPinInput" type="password" inputmode="numeric" maxlength="8" placeholder="Obecny PIN" autocomplete="current-password" aria-label="Obecny PIN" />
+                  <div class="inline-form">
+                    <input id="newPinInput" type="password" inputmode="numeric" maxlength="8" placeholder="Nowy PIN" autocomplete="new-password" aria-label="Nowy PIN" />
+                    <button class="btn btn-quiet" type="submit">Zmień</button>
+                  </div>
+                  <p id="pinRuleHint" class="hint"></p>
                 </form>
               </article>
               <article class="card">
@@ -617,13 +626,19 @@
           <h2 id="userDialogTitle">Nowy użytkownik</h2>
           <button class="icon-btn" type="button" data-close aria-label="Zamknij"><svg class="icon"><use href="#i-close" /></svg></button>
         </header>
+        <!-- Pierwsze konto: kod z logów kontenera (docker compose logs calico) -->
+        <div id="setupCodeField" class="field" hidden>
+          <label for="setupCodeInput">Kod pierwszego uruchomienia</label>
+          <input id="setupCodeInput" maxlength="32" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="np. K7QM-3XRP-9WTD" />
+          <p class="hint">Kod znajdziesz w logach kontenera: <code data-i18n-skip>docker compose logs calico</code></p>
+        </div>
         <div class="field">
           <label for="newUserName">Nazwa</label>
           <input id="newUserName" maxlength="128" required autocomplete="off" />
         </div>
         <div class="form-grid">
           <div class="field">
-            <label for="newUserPin">PIN (4–8 cyfr)</label>
+            <label id="newUserPinLabel" for="newUserPin">PIN</label>
             <input id="newUserPin" type="password" inputmode="numeric" maxlength="8" required autocomplete="new-password" />
           </div>
           <div class="field">
@@ -636,8 +651,34 @@
       </form>
     </dialog>
 
+    <!-- Wymuszona zmiana zbyt krótkiego PIN-u (nie da się zamknąć) -->
+    <dialog id="forcedPinDialog" class="sheet" aria-labelledby="forcedPinTitle" data-forced>
+      <form id="forcedPinForm" class="sheet-body">
+        <div class="sheet-grabber" aria-hidden="true"></div>
+        <header class="sheet-head">
+          <h2 id="forcedPinTitle">Ustaw nowy PIN</h2>
+        </header>
+        <p id="forcedPinHint" class="hint"></p>
+        <div class="form-grid">
+          <div class="field">
+            <label for="forcedPinNew">Nowy PIN</label>
+            <input id="forcedPinNew" type="password" inputmode="numeric" maxlength="8" required autocomplete="new-password" />
+          </div>
+          <div class="field">
+            <label for="forcedPinRepeat">Powtórz PIN</label>
+            <input id="forcedPinRepeat" type="password" inputmode="numeric" maxlength="8" required autocomplete="new-password" />
+          </div>
+        </div>
+        <p id="forcedPinError" class="form-status error" aria-live="polite"></p>
+        <div class="button-row spread">
+          <button id="forcedPinLogoutBtn" class="btn btn-quiet" type="button">Zmień użytkownika</button>
+          <button id="forcedPinSaveBtn" class="btn btn-primary" type="submit">Zapisz nowy PIN</button>
+        </div>
+      </form>
+    </dialog>
+
     <!-- Wymuszone uzupełnienie profilu (nie da się zamknąć) -->
-    <dialog id="onboardingDialog" class="sheet sheet-tall" aria-labelledby="onboardingTitle">
+    <dialog id="onboardingDialog" class="sheet sheet-tall" aria-labelledby="onboardingTitle" data-forced>
       <form id="onboardingForm" class="sheet-body" novalidate>
         <img class="sheet-banner" src="/icons/banner-720.jpg" srcset="/icons/banner-720.jpg 720w, /icons/banner-1200.jpg 1200w" width="1219" height="453" sizes="(min-width: 560px) 520px, calc(100vw - 32px)" alt="" />
         <header class="sheet-head">

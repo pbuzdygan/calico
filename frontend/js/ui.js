@@ -52,9 +52,9 @@ export function closeSheet(dialog) {
 
 document.querySelectorAll("dialog.sheet").forEach((dialog) => {
   dialog.querySelectorAll("[data-close]").forEach((button) => button.addEventListener("click", () => closeSheet(dialog)));
-  // Klik w tło zamyka panel (poza wymuszonym uzupełnieniem profilu).
+  // Klik w tło zamyka panel (poza wymuszonymi: profil, zmiana PIN-u – data-forced).
   dialog.addEventListener("click", (event) => {
-    if (event.target === dialog && dialog.id !== "onboardingDialog") closeSheet(dialog);
+    if (event.target === dialog && !dialog.hasAttribute("data-forced")) closeSheet(dialog);
   });
 });
 

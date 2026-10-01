@@ -73,12 +73,28 @@ MESSAGES: dict[str, str] = {
     "Za dużo błędnych prób PIN-u. Spróbuj ponownie za {minutes} min.": "Too many wrong PIN attempts. Try again in {minutes} min.",
     "Niepoprawny PIN.": "Wrong PIN.",
     "Niepoprawny PIN. Pozostałe próby: {left}.": "Wrong PIN. Attempts left: {left}.",
-    "Sesja wygasła albo PIN jest niepoprawny – odblokuj ponownie.": "Your session has expired or the PIN is wrong – unlock again.",
+    "Sesja wygasła – odblokuj ponownie PIN-em.": "Your session has expired – unlock again with your PIN.",
+    "Niepoprawna nazwa lub PIN.": "Wrong name or PIN.",
+    "Niepoprawna nazwa lub PIN. Pozostałe próby: {left}.": "Wrong name or PIN. Attempts left: {left}.",
+    "Zbyt wiele nieudanych prób logowania z tego adresu. Spróbuj ponownie za {minutes} min.": (
+        "Too many failed sign-in attempts from this address. Try again in {minutes} min."
+    ),
+    "Obecny PIN jest niepoprawny.": "The current PIN is wrong.",
+    "Obecny PIN jest niepoprawny. Pozostałe próby: {left}.": "The current PIN is wrong. Attempts left: {left}.",
+    "Nowy PIN musi być inny niż obecny.": "The new PIN must be different from the current one.",
+    "Twój PIN jest za krótki. Ustaw nowy PIN ({min}–{max} cyfr), aby kontynuować.": (
+        "Your PIN is too short. Set a new PIN ({min}–{max} digits) to continue."
+    ),
+    "Lista użytkowników jest ukryta – zaloguj się nazwą i PIN-em.": "The user list is hidden – sign in with your name and PIN.",
+    "Niepoprawny kod pierwszego uruchomienia. Znajdziesz go w logach kontenera (docker compose logs calico).": (
+        "Wrong setup code. You can find it in the container logs (docker compose logs calico)."
+    ),
     "Uzupełnij profil (płeć, wiek, wzrost, waga, aktywność, cel) – bez niego CALICO nie może wyliczyć planu.": (
         "Complete your profile (sex, age, height, weight, activity, goal) – CALICO cannot calculate a plan without it."
     ),
     "Zakładanie nowych kont jest wyłączone (ALLOW_SIGNUP=false).": "Creating new accounts is disabled (ALLOW_SIGNUP=false).",
-    "PIN musi mieć 4-8 cyfr.": "The PIN must have 4-8 digits.",
+    "PIN musi mieć {min}–{max} cyfr.": "The PIN must have {min}–{max} digits.",
+    "PIN jest zbyt prosty (np. 123456 albo 111111) – wybierz inny.": "The PIN is too simple (e.g. 123456 or 111111) – choose another one.",
     "Start planu nie może być w przyszłości.": "The plan start cannot be in the future.",
     "Start planu nie może być wcześniejszy niż {date}.": "The plan start cannot be earlier than {date}.",
     # czat / tryb tekstowy

@@ -6,7 +6,7 @@ CALICO is a simple log for calories, macronutrients, body weight and waist circu
 
 ## What it does
 
-- keeps daily entries per user (4–8 digit PIN),
+- keeps daily entries per user, each protected by a PIN (6–8 digits by default),
 - records: `Weight`, `Waist`, `Breakfast`, `Lunch`, `Dinner`, `Snack`, `Daily balance`,
 - calculates the day's total kcal and macros, and the kcal target (Mifflin-St Jeor × activity × goal adjustment),
 - `Log`: edit, duplicate, move and delete entries, undo the last change, clear a day,
@@ -110,7 +110,13 @@ cp .env.example .env          # review the settings, see "Configuration" below
 docker compose up -d
 ```
 
-Open `http://localhost:8380` (or `http://<server-ip>:8380` from another device on your network). On first launch there is no user and no default PIN – the app asks you to create the first user (name and PIN) and then requires completing the profile. The PIN can be changed in `Settings`.
+Open `http://localhost:8380` (or `http://<server-ip>:8380` from another device on your network). On first launch there is no user and no default PIN – the app asks you to create the first user (name and PIN) and then requires completing the profile. Creating the first user needs the **setup code** printed in the container logs, so nobody else can claim a freshly started instance:
+
+```bash
+docker compose logs calico | grep "Setup code"
+```
+
+The PIN can be changed in `Settings`.
 
 | Image tag | What it is |
 |---|---|
@@ -161,6 +167,9 @@ Every key is optional; `.env.example` explains each one in detail.
 | `APP_TIMEZONE` | `Europe/Warsaw` | time zone used to determine "today" (IANA name) |
 | `SQLITE_PATH` | `/data/calico.db` | database path; both compose files set it to the data volume |
 | `ALLOW_SIGNUP` | `true` | `false` = new accounts can only be created on first launch (when no user exists); `POST /api/users` then returns `403`. Use `false` on any internet-facing instance |
+| `SHOW_USER_LIST` | `true` | `false` = the login screen asks for the user name instead of listing all users. Use `false` on any internet-facing instance |
+| `PIN_MIN_LENGTH` | `6` | minimum length of new PINs (4–8). Existing shorter PINs must be changed after the next sign-in |
+| `FORWARDED_ALLOW_IPS` | `127.0.0.1,::1` | addresses of reverse proxies trusted to report the client IP (`X-Forwarded-For`); IP addresses or networks, e.g. `172.16.0.0/12`. Required behind a proxy for per-client rate limiting |
 | `SESSION_TTL_HOURS` | `12` | how long a session stays valid after a PIN unlock |
 | `SESSION_SECRET` | empty | session signing key; empty = generated automatically and stored in the database |
 | `CORS_ORIGIN` | empty | empty = no CORS (frontend and API on the same origin) |
@@ -169,15 +178,21 @@ Every key is optional; `.env.example` explains each one in detail.
 
 ## API
 
-Messages and texts in responses use the language from the `Accept-Language` header (`pl` by default, `en`). All data endpoints require a `user_id` parameter (query or path) and authentication: `Authorization: Bearer <token>` (token from `POST /api/auth/verify`, valid for `SESSION_TTL_HOURS`) or the `X-User-PIN` header. Errors: `401` wrong PIN, `403` signup disabled, `404` object not found, `409` conflict (e.g. a second `Weight` entry on a day), `422` invalid data, `429` PIN locked after failed attempts, `428` profile not completed (applies to days, entries, reports, plan, export and chat).
+Messages and texts in responses use the language from the `Accept-Language` header (`pl` by default, `en`). All data endpoints require a `user_id` parameter (query or path) and a session token: `Authorization: Bearer <token>` from `POST /api/auth/verify` (valid for `SESSION_TTL_HOURS`). The PIN is accepted **only** by `POST /api/auth/verify` (and as `current_pin` when changing it). Errors: `401` wrong PIN or expired session, `403` forbidden (signup disabled, wrong setup code, hidden user list, wrong current PIN), `404` object not found, `409` conflict (e.g. a second `Weight` entry on a day), `422` invalid data, `429` too many failed attempts (with `Retry-After`), `428` an action is required first – `{"code": "pin_change_required"}` (PIN shorter than `PIN_MIN_LENGTH`, only PIN and language changes work until then) or `{"code": "profile_required"}` (profile not completed; applies to days, entries, reports, plan, export and chat).
 
-Users and profile:
+Users and sign-in:
 
-- `GET /api/users` (empty list = first launch), `POST /api/users` — `{"display_name": "Ala", "pin": "2468"}` (`403` when `ALLOW_SIGNUP=false` and a user already exists), `DELETE /api/users/{user_id}`
-- `POST /api/users/{user_id}/pin` — `{"new_pin": "5678"}`; invalidates old tokens and returns a new one
-- `PUT /api/users/{user_id}/language` — `{"language": "en"}` (`pl`/`en`); `POST /api/auth/verify` returns the stored `language`
-- PIN lockout: after 5 failed attempts the account is locked for 5 min, subsequent series for 10, 20, 40 and max. 60 min (`429` with a `Retry-After` header, also for a correct PIN). A correct PIN resets the counter. An open session (token) keeps working. Constants `PIN_*` in `services.py`.
-- `POST /api/auth/verify` — `{"user_id": 1, "pin": "1234"}` → `{"ok": true, "token": "…", "expires_at": "…"}`
+- `GET /api/meta` — server's today date, time zone, `allow_signup`, `setup_required` (no users yet), `show_user_list`, `pin_min_length`
+- `GET /api/users` — list for the login screen (`403` when `SHOW_USER_LIST=false`)
+- `POST /api/users` — `{"display_name": "Ala", "pin": "730518", "setup_code": "K7QM-3XRP-9WTD"}`; `setup_code` (from the container logs) is required only for the first user. New PINs: `PIN_MIN_LENGTH`–8 digits, no trivial sequences (`123456`, `111111`). `403` when `ALLOW_SIGNUP=false` and a user already exists
+- `POST /api/auth/verify` — `{"user_id": 1, "pin": "730518", "device_tokens": ["…"]}` or `{"name": "Ala", …}` (the name is case-insensitive) → `{"ok": true, "token": "…", "expires_at": "…", "user_id": 1, "display_name": "Ala", "language": "pl", "device_token": "…", "pin_change_required": false, "failed_attempts": 0}`. `device_token` marks the browser as a trusted device (kept in `localStorage`, valid 180 days) and is sent back in `device_tokens` on the next sign-ins; `failed_attempts` = failed sign-ins since the last successful one
+- `POST /api/users/{user_id}/pin` — `{"current_pin": "730518", "new_pin": "604817"}`; invalidates old tokens and returns a new one
+- `PUT /api/users/{user_id}/language` — `{"language": "en"}` (`pl`/`en`)
+- `DELETE /api/users/{user_id}`
+- Rate limiting (`429` with `Retry-After`, also for a correct PIN): **per IP** – 10 failed sign-ins in 15 min block the address for 15 min, doubling up to 24 h; **per account and source** (trusted device or IP) – 5 failures lock that pair for 5, 10, 20, 40, max. 60 min, so an attacker locks only themselves; **per account** – from 20 failures, every further 5 lock the account for 15 min, doubling up to 24 h, for untrusted devices only; this counter is not reset by a successful sign-in, only after 7 days without failures. A trusted device is never blocked by the IP or account limits, only by its own pair limit. An open session keeps working. Constants in `app/login_guard.py` and `ACCOUNT_*` in `services.py`.
+
+Profile:
+
 - `GET|PUT /api/profile/{user_id}` — `is_complete=false` and empty fields until the profile is saved; `PUT` requires all fields. `weight_kg` is the plan weight, `current_weight_kg` is the latest measurement. `macro_targets`: effective targets `protein_g`, `fat_g`, `carbs_g` and `manual_*` (null = automatic)
 - `PUT /api/profile/{user_id}/macros` — `{"protein_g": 170}`; fields optional (missing/null = automatic, `{}` restores automatic), ranges: protein 0–500, fat 0–400, carbs 0–1000 g
 - `POST /api/profile/{user_id}/preview` — BMR/TDEE/target preview for form data (no save, works before the profile is completed)
@@ -224,31 +239,28 @@ Full check as in CI (ruff + pytest in a container, `node --check` of frontend mo
 
 ## Security
 
-CALICO works on a home network out of the box and can be exposed to the internet behind a reverse proxy. What it protects against, and what you need to add yourself before exposing it to the internet:
+CALICO works on a home network out of the box and can be exposed to the internet behind a reverse proxy with HTTPS.
 
 **Built in**
 
-- PIN hashed with PBKDF2-SHA256 (120k iterations), constant-time comparison. The PIN is never stored in the browser.
-- After 5 failed PINs the account is temporarily locked (5 → 10 → 20 → 40 → 60 min).
+- PIN hashed with PBKDF2-SHA256 (120k iterations), constant-time comparison. The PIN is never stored in the browser and is accepted only by the sign-in endpoint.
+- New PINs have 6–8 digits by default (`PIN_MIN_LENGTH`) and trivial sequences are rejected; shorter PINs from older versions must be changed after the next sign-in. Changing the PIN requires the current PIN.
+- Three layers against PIN guessing: per IP address, per account and source (an attacker locks out only themselves, not the owner), and per account for attacks from many addresses – with trusted devices (browsers that signed in before) exempt, so nobody can lock you out of your own phone. After signing in you see how many failed attempts there were. Once an attack is detected an account gets at most 5 guesses a day from untrusted devices, which for a 6-digit PIN means about a 0.2% chance per year (8 digits: about 0.002%).
+- `SHOW_USER_LIST=false` hides the user names; unknown names and wrong PINs get the same answer.
+- The first user can only be created with the setup code from the container logs.
 - After unlocking, the browser receives a signed session token (HMAC-SHA256, valid for `SESSION_TTL_HOURS`) kept in `sessionStorage`: the session survives a tab reload (e.g. when a phone suspends the browser in the background) and disappears when the tab is closed or on logout. Changing the PIN invalidates all earlier sessions.
 - `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy` headers; no `Server` header; API documentation disabled by default; request body size limit.
 - Container: the app runs as an unprivileged user (`PUID`/`PGID`), read-only root filesystem, all Linux capabilities dropped except `CHOWN`/`SETUID`/`SETGID` used once by the start-up script (the app process has none), `no-new-privileges` (see `docker-compose.yml`).
 - SQLite in `WAL` mode, `foreign_keys=ON`; secrets kept out of the repo (`.env` in `.gitignore`).
 
-**Known limits** – acceptable on a trusted home network, not on the open internet:
+**If you host it on the internet**, put it behind a reverse proxy (Caddy, nginx, Traefik) with HTTPS and a valid certificate (and HSTS) – CALICO itself speaks plain HTTP. Then:
 
-- The login screen lists all user names (`GET /api/users` needs no authentication).
-- A 4-digit PIN with the lockout above can be guessed in weeks by a determined attacker, and anyone can lock an account out by entering wrong PINs. There is no per-IP rate limiting.
-- The app speaks plain HTTP; it has no TLS of its own.
-- On a fresh instance, whoever opens it first creates the first account.
+1. set `FORWARDED_ALLOW_IPS` to the proxy's address or network (e.g. `172.16.0.0/12` for a proxy container on the Docker network). Without it every client appears to come from the proxy, so one attacker would block new sign-ins for everyone (trusted devices keep working). Never set it to `*` when the container port is reachable directly,
+2. create all accounts first, then set `ALLOW_SIGNUP=false` and `SHOW_USER_LIST=false`,
+3. publish the container port on localhost only (`"127.0.0.1:8380:8000"`) so the proxy is the only way in,
+4. optionally add request rate limiting at the proxy and an extra authentication layer (VPN such as WireGuard or Tailscale, Authelia, Authentik, Cloudflare Access) for defence in depth.
 
-**If you host it on the internet**, put it behind a reverse proxy (Caddy, nginx, Traefik) that provides:
-
-1. HTTPS with a valid certificate (and HSTS),
-2. an extra authentication layer in front of the whole app – e.g. a VPN (WireGuard, Tailscale), an identity-aware proxy (Authelia, Authentik, Cloudflare Access) or at least HTTP basic auth,
-3. request rate limiting and a request size limit.
-
-Also: create all accounts first, then set `ALLOW_SIGNUP=false`; publish the container port on localhost only (`"127.0.0.1:8380:8000"`); use 6–8 digit PINs. CALICO stores health data (weight, diet) – if you host it for other people, you are responsible for protecting it.
+CALICO stores health data (weight, diet) – if you host it for other people, you are responsible for protecting it.
 
 Reporting vulnerabilities: see [`SECURITY.md`](SECURITY.md).
 

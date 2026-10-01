@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, selectinload
 from . import clock
 from .config import settings
 from .i18n import get_language, t, use_language
+from .login_guard import LoginBlocked, guard
 from .models import AppMeta, DayEntry, DayLog, Profile, User
 from .schemas import (
     DayDetailOut,
@@ -27,7 +28,22 @@ from .schemas import (
     ReportDayOut,
     ReportSummaryOut,
 )
-from .security import create_session_token, hash_pin, new_secret, pin_fingerprint, read_session_token, validate_pin, verify_pin
+from .security import (
+    burn_pin_check,
+    create_device_token,
+    create_session_token,
+    hash_pin,
+    is_trivial_pin,
+    new_device_id,
+    new_secret,
+    new_setup_code,
+    pin_fingerprint,
+    read_device_token,
+    read_session_token,
+    setup_code_matches,
+    validate_pin,
+    verify_pin,
+)
 
 
 class InputError(ValueError):
@@ -42,13 +58,34 @@ class ForbiddenError(PermissionError):
     """Operacja wylaczona konfiguracja (HTTP 403)."""
 
 
+def _minutes(seconds: int) -> int:
+    return max(1, -(-seconds // 60))
+
+
 class PinLockedError(Exception):
-    """Za duzo blednych PIN-ow (HTTP 429)."""
+    """Za duzo blednych PIN-ow dla konta / pary konto+zrodlo (HTTP 429)."""
 
     def __init__(self, retry_after_seconds: int):
         self.retry_after_seconds = retry_after_seconds
-        minutes = max(1, -(-retry_after_seconds // 60))
-        super().__init__(t("Za dużo błędnych prób PIN-u. Spróbuj ponownie za {minutes} min.", minutes=minutes))
+        super().__init__(t("Za dużo błędnych prób PIN-u. Spróbuj ponownie za {minutes} min.", minutes=_minutes(retry_after_seconds)))
+
+
+class IpBlockedError(PinLockedError):
+    """Za duzo nieudanych prob logowania z jednego adresu IP (HTTP 429)."""
+
+    def __init__(self, retry_after_seconds: int):
+        Exception.__init__(
+            self, t("Zbyt wiele nieudanych prób logowania z tego adresu. Spróbuj ponownie za {minutes} min.", minutes=_minutes(retry_after_seconds))
+        )
+        self.retry_after_seconds = retry_after_seconds
+
+
+class WrongPinError(Exception):
+    """Bledny PIN przy logowaniu (HTTP 401). Licznik bledow jest juz w sesji bazy - wywolujacy zatwierdza transakcje."""
+
+
+class PinChangeRequiredError(Exception):
+    """PIN krotszy niz PIN_MIN_LENGTH - najpierw zmiana PIN-u (HTTP 428, code=pin_change_required)."""
 
 
 class NotFoundError(LookupError):
@@ -69,10 +106,19 @@ POLISH_TRANSLATION_TABLE = str.maketrans(
     }
 )
 
-# T3.1 / SEC-01: blokada po blednych PIN-ach - co PIN_MAX_ATTEMPTS bledow blokada 5, 10, 20, 40, 60, 60... min.
-PIN_MAX_ATTEMPTS = 5
-PIN_LOCK_BASE_MINUTES = 5
-PIN_LOCK_MAX_MINUTES = 60
+# T-PUB: blokada calego konta (w bazie) przy atakach z wielu adresow - nie dotyczy zaufanych urzadzen.
+# Od ACCOUNT_SOFT_LIMIT bledow co ACCOUNT_LOCK_STEP bledow blokada 15, 30, 60... min (maks. 24 h). Licznik NIE zeruje sie
+# przy udanym logowaniu (inaczej codzienne logowanie wlasciciela odnawialoby pule prob atakujacego), tylko po
+# ACCOUNT_FORGET_DAYS bez bledow. W stanie ustalonym atak to maks. ACCOUNT_LOCK_STEP prob na dobe.
+# Blokady per IP i per para konto+zrodlo: app/login_guard.py.
+ACCOUNT_SOFT_LIMIT = 20
+ACCOUNT_LOCK_STEP = 5
+ACCOUNT_FORGET_DAYS = 7
+ACCOUNT_LOCK_BASE_MINUTES = 15
+ACCOUNT_LOCK_MAX_MINUTES = 24 * 60
+DEVICE_TOKEN_TTL_DAYS = 180
+PIN_MAX_LENGTH = 8
+SETUP_CODE_KEY = "setup_code"
 
 # T2.3: domyslny podzial celu kcal na makro (ogolne zalozenie). Bialko i tluszcz jako % energii celu,
 # weglowodany = reszta energii. Recznie wpisany cel (Profile.*_target_g) zastepuje wartosc wyliczona.
@@ -566,16 +612,48 @@ def list_users(db: Session) -> list[User]:
     return list(db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.display_name)))
 
 
+def has_users(db: Session) -> bool:
+    return bool(db.scalar(select(func.count(User.id))))
+
+
 def signup_allowed(db: Session) -> bool:
     """ALLOW_SIGNUP=false blokuje nowe konta, ale pierwszy uzytkownik musi moc powstac (D10)."""
-    return settings.allow_signup or not db.scalar(select(func.count(User.id)))
+    return settings.allow_signup or not has_users(db)
 
 
-def create_user(db: Session, display_name: str, pin: str) -> User:
+def ensure_setup_code(db: Session) -> str | None:
+    """T-PUB: kod wymagany do utworzenia pierwszego konta (pokazywany w logach kontenera). None, gdy konta juz sa."""
+    meta = db.get(AppMeta, SETUP_CODE_KEY)
+    if has_users(db):
+        if meta is not None:
+            db.delete(meta)
+            db.flush()
+        return None
+    if meta is None:
+        meta = AppMeta(key=SETUP_CODE_KEY, value=new_setup_code())
+        db.add(meta)
+        db.flush()
+    return meta.value
+
+
+def check_new_pin(pin: str) -> None:
+    """Polityka nowego PIN-u (zakladanie konta, zmiana): PIN_MIN_LENGTH-8 cyfr, bez trywialnych ciagow."""
+    if not re.fullmatch(rf"\d{{{settings.pin_min_length},{PIN_MAX_LENGTH}}}", pin or ""):
+        raise InputError(t("PIN musi mieć {min}–{max} cyfr.", min=settings.pin_min_length, max=PIN_MAX_LENGTH))
+    if is_trivial_pin(pin):
+        raise InputError(t("PIN jest zbyt prosty (np. 123456 albo 111111) – wybierz inny."))
+
+
+def create_user(db: Session, display_name: str, pin: str, setup_code: str | None = None, ip: str = "") -> User:
     if not signup_allowed(db):
         raise ForbiddenError(t("Zakładanie nowych kont jest wyłączone (ALLOW_SIGNUP=false)."))
-    if not validate_pin(pin):
-        raise InputError(t("PIN musi mieć 4-8 cyfr."))
+    expected = ensure_setup_code(db)
+    if expected is not None:
+        _check_ip(ip)
+        if not setup_code_matches(setup_code or "", expected):
+            guard.ip_failure(ip, clock.utcnow_naive())
+            raise ForbiddenError(t("Niepoprawny kod pierwszego uruchomienia. Znajdziesz go w logach kontenera (docker compose logs calico)."))
+    check_new_pin(pin)
     display_name = display_name.strip()
     slug_base = slugify(display_name)[:50] or "user"
     slug = slug_base
@@ -586,40 +664,112 @@ def create_user(db: Session, display_name: str, pin: str) -> User:
     user = User(slug=slug, display_name=display_name, pin_hash=hash_pin(pin), is_active=True)
     db.add(user)
     db.flush()
+    ensure_setup_code(db)  # pierwszy uzytkownik istnieje - kod przestaje dzialac
     # Bez profilu: uzytkownik musi go uzupelnic przy pierwszym logowaniu (is_profile_complete).
     return user
 
 
-def _pin_lock_minutes(failed_attempts: int) -> int:
-    lockouts = failed_attempts // PIN_MAX_ATTEMPTS
-    return min(PIN_LOCK_BASE_MINUTES * 2 ** (lockouts - 1), PIN_LOCK_MAX_MINUTES)
+# --- T-PUB: logowanie --------------------------------------------------------------------------------
 
 
-def pin_attempts_left(user: User) -> int:
-    return PIN_MAX_ATTEMPTS - (user.failed_pin_attempts or 0) % PIN_MAX_ATTEMPTS
+@dataclass
+class LoginResult:
+    user: User
+    token: str
+    expires_at: datetime
+    device_token: str
+    failed_attempts: int
 
 
-def require_user_pin(db: Session, user_id: int, pin: str) -> User | None:
-    """Sprawdza PIN z blokada po PIN_MAX_ATTEMPTS bledach (rosnaco do PIN_LOCK_MAX_MINUTES).
+def _check_ip(ip: str) -> None:
+    try:
+        guard.check_ip(ip, clock.utcnow_naive())
+    except LoginBlocked as blocked:
+        raise IpBlockedError(blocked.retry_after_seconds) from None
 
-    Zwraca None przy blednym PIN-ie (licznik zwiekszony - wywolujacy musi zatwierdzic transakcje),
-    rzuca PinLockedError, gdy konto jest zablokowane - nawet przy poprawnym PIN-ie.
-    """
-    user = db.get(User, user_id)
-    if not user:
+
+def _find_login_user(db: Session, user_id: int | None, name: str | None) -> User | None:
+    if user_id is not None:
+        user = db.get(User, user_id)
+    else:
+        wanted = (name or "").strip()
+        if not wanted:
+            return None
+        user = db.scalar(select(User).where(User.slug == slugify(wanted)[:64]))
+        if user is None:
+            user = next((candidate for candidate in list_users(db) if candidate.display_name.casefold() == wanted.casefold()), None)
+    return user if user is not None and user.is_active else None
+
+
+def _login_key(user: User | None, user_id: int | None, name: str | None) -> str:
+    if user is not None:
+        return f"u:{user.id}"
+    # nieistniejace konto liczone tak samo jak istniejace - odpowiedz nie zdradza, czy uzytkownik jest
+    return f"n:{(name or '').strip().casefold()}" if user_id is None else f"u:{user_id}"
+
+
+def _trusted_device(db: Session, user: User | None, device_tokens: list[str]) -> str | None:
+    if user is None:
         return None
-    now = clock.utcnow_naive()
-    if user.pin_locked_until and user.pin_locked_until > now:
-        raise PinLockedError(int((user.pin_locked_until - now).total_seconds()))
-    if validate_pin(pin) and verify_pin(pin, user.pin_hash):
-        user.failed_pin_attempts = 0
-        user.pin_locked_until = None
-        return user
-    user.failed_pin_attempts = (user.failed_pin_attempts or 0) + 1
-    if user.failed_pin_attempts % PIN_MAX_ATTEMPTS == 0:
-        user.pin_locked_until = now + timedelta(minutes=_pin_lock_minutes(user.failed_pin_attempts))
-    db.flush()
+    now = int(clock.now_utc().timestamp())
+    secret = _session_secret(db)
+    for token in device_tokens[:10]:
+        data = read_device_token(token, secret, now)
+        if data and data.get("uid") == user.id:
+            return str(data.get("did"))
     return None
+
+
+def _wrong_pin_message(left: int, locked_for: int | None) -> str:
+    base = t("Niepoprawny PIN.") if settings.show_user_list else t("Niepoprawna nazwa lub PIN.")
+    if locked_for:
+        return f"{base} {PinLockedError(locked_for)}"
+    if settings.show_user_list:
+        return t("Niepoprawny PIN. Pozostałe próby: {left}.", left=left)
+    return t("Niepoprawna nazwa lub PIN. Pozostałe próby: {left}.", left=left)
+
+
+def login(db: Session, *, user_id: int | None, name: str | None, pin: str, ip: str, device_tokens: list[str]) -> LoginResult:
+    """Weryfikacja PIN-u z trzema warstwami ochrony (login_guard + blokada konta). Rzuca WrongPinError / PinLockedError."""
+    now = clock.utcnow_naive()
+    user = _find_login_user(db, user_id, name)
+    device = _trusted_device(db, user, device_tokens)
+    pair_key = f"{_login_key(user, user_id, name)}|" + (f"dev:{device}" if device else f"ip:{ip}")
+    try:
+        guard.check(ip, pair_key, now, include_ip=device is None)
+    except LoginBlocked as blocked:
+        raise (IpBlockedError if blocked.scope == "ip" else PinLockedError)(blocked.retry_after_seconds) from None
+    if user is not None and device is None and user.pin_locked_until and user.pin_locked_until > now:
+        raise PinLockedError(int((user.pin_locked_until - now).total_seconds()))
+
+    if user is None:
+        burn_pin_check(pin)
+    if user is None or not (validate_pin(pin) and verify_pin(pin, user.pin_hash)):
+        left, locked_for = guard.failure(ip, pair_key, now)
+        if user is not None:
+            if user.last_failed_pin_at and now - user.last_failed_pin_at > timedelta(days=ACCOUNT_FORGET_DAYS):
+                user.failed_pin_attempts = 0
+            user.failed_pin_attempts = (user.failed_pin_attempts or 0) + 1
+            user.failed_since_login = (user.failed_since_login or 0) + 1
+            user.last_failed_pin_at = now
+            over = user.failed_pin_attempts - ACCOUNT_SOFT_LIMIT
+            if device is None and over >= 0 and over % ACCOUNT_LOCK_STEP == 0:
+                minutes = min(ACCOUNT_LOCK_BASE_MINUTES * 2 ** (over // ACCOUNT_LOCK_STEP), ACCOUNT_LOCK_MAX_MINUTES)
+                user.pin_locked_until = now + timedelta(minutes=minutes)
+                locked_for = max(locked_for or 0, minutes * 60)
+            db.flush()
+        raise WrongPinError(_wrong_pin_message(left, locked_for))
+
+    guard.success(pair_key)
+    failed_attempts = user.failed_since_login or 0
+    user.failed_since_login = 0  # eskalacja blokady konta (failed_pin_attempts) zostaje - patrz ACCOUNT_FORGET_DAYS
+    if len(pin) < settings.pin_min_length:
+        user.pin_change_required = True
+    db.flush()
+    token, expires_at = issue_session(db, user)
+    device_expires = int((clock.now_utc() + timedelta(days=DEVICE_TOKEN_TTL_DAYS)).timestamp())
+    device_token = create_device_token(user.id, device or new_device_id(), _session_secret(db), device_expires)
+    return LoginResult(user=user, token=token, expires_at=expires_at, device_token=device_token, failed_attempts=failed_attempts)
 
 
 def _session_secret(db: Session) -> str:
@@ -649,10 +799,31 @@ def user_from_session(db: Session, user_id: int, token: str) -> User | None:
     return user
 
 
-def change_user_pin(db: Session, user: User, new_pin: str) -> None:
-    if not validate_pin(new_pin):
-        raise InputError(t("PIN musi mieć 4-8 cyfr."))
+def require_pin_current(user: User) -> None:
+    """Dostep do danych dopiero po zmianie zbyt krotkiego PIN-u (T-PUB)."""
+    if user.pin_change_required:
+        raise PinChangeRequiredError(t("Twój PIN jest za krótki. Ustaw nowy PIN ({min}–{max} cyfr), aby kontynuować.", min=settings.pin_min_length, max=PIN_MAX_LENGTH))
+
+
+def change_user_pin(db: Session, user: User, current_pin: str, new_pin: str, ip: str = "") -> None:
+    """Zmiana PIN-u wymaga obecnego PIN-u (przejeta sesja nie wystarczy do przejecia konta)."""
+    now = clock.utcnow_naive()
+    pair_key = f"u:{user.id}|pin-change:{ip}"
+    try:
+        guard.check(ip, pair_key, now, include_ip=False)
+    except LoginBlocked as blocked:
+        raise PinLockedError(blocked.retry_after_seconds) from None
+    if not (validate_pin(current_pin or "") and verify_pin(current_pin, user.pin_hash)):
+        left, locked_for = guard.failure(ip, pair_key, now)
+        if locked_for:
+            raise ForbiddenError(f"{t('Obecny PIN jest niepoprawny.')} {PinLockedError(locked_for)}")
+        raise ForbiddenError(t("Obecny PIN jest niepoprawny. Pozostałe próby: {left}.", left=left))
+    guard.success(pair_key)
+    check_new_pin(new_pin)
+    if new_pin == current_pin:
+        raise InputError(t("Nowy PIN musi być inny niż obecny."))
     user.pin_hash = hash_pin(new_pin)
+    user.pin_change_required = False
     db.flush()
 
 

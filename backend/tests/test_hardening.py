@@ -1,5 +1,7 @@
 """Utwardzenie przed publicznym obrazem: dokumentacja API wylaczona, limit rozmiaru zadania, naglowki."""
 
+from .conftest import AUTH
+
 
 def test_api_docs_disabled_by_default(client):
     for path in ("/docs", "/redoc", "/openapi.json"):
@@ -31,7 +33,7 @@ def test_import_sized_body_is_accepted(client, uid):
     response = client.post(
         f"/api/import?user_id={uid}",
         json={"content": "#" + "x" * 999_000},
-        headers={"X-User-PIN": "1234"},
+        headers=AUTH,
     )
     assert response.status_code != 413
 

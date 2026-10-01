@@ -4,6 +4,8 @@ import pytest
 
 from app.config import settings
 
+from .conftest import create_user
+
 
 @pytest.fixture
 def signup_disabled(monkeypatch):
@@ -12,17 +14,17 @@ def signup_disabled(monkeypatch):
 
 def test_signup_enabled_by_default(client, uid):
     assert client.get("/api/meta").json()["allow_signup"] is True
-    assert client.post("/api/users", json={"display_name": "Druga Osoba", "pin": "2468"}).status_code == 200
+    assert client.post("/api/users", json={"display_name": "Druga Osoba", "pin": "246809"}).status_code == 200
 
 
 def test_first_user_allowed_when_signup_disabled(client, signup_disabled):
     assert client.get("/api/meta").json()["allow_signup"] is True  # brak uzytkownikow -> pierwszy start
-    assert client.post("/api/users", json={"display_name": "Pierwsza", "pin": "2468"}).status_code == 200
+    create_user(client, "Pierwsza")
     assert client.get("/api/meta").json()["allow_signup"] is False
 
 
 def test_next_users_blocked_when_signup_disabled(client, uid, signup_disabled):
-    response = client.post("/api/users", json={"display_name": "Intruz", "pin": "2468"})
+    response = client.post("/api/users", json={"display_name": "Intruz", "pin": "246809"})
     assert response.status_code == 403
     assert "wyłączone" in response.json()["detail"]
     assert [user["display_name"] for user in client.get("/api/users").json()] == ["Test"]
