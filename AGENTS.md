@@ -16,7 +16,9 @@ CALICO — dziennik kalorii, makroskładników, wagi i obwodu pasa. Wpisy przez 
   - `js/` — moduły ES bez bundlera (punkt wejścia `js/main.js`, opis modułów w jego nagłówku): `config.js` (stałe), `state.js` (`el`, `state`), `util.js`, `ui.js` (toasty, `withBusy`, panele), `api.js` (`fetchJSON`, sesja), `auth.js` (blokada, użytkownicy), `nav.js`, `charts.js` (SVG), `views/{today,log,progress,goals,settings}.js`, `entry-sheet.js` (panel wpisu, akcje pozycji), `profile-form.js` (korekta celu, onboarding D8). Nowy plik JS dopisz do `SHELL` w `sw.js` i podbij `CACHE`
   - `styles.css` — tokeny kolorów z `docs/UI design.md` (`:root`), karty hero/metric/info, mobile-first, boczna nawigacja od 960 px
   - `manifest.json`, `sw.js`, `icons/` (generowane: `scripts/generate_icons.py` z `branding/`), `fonts/` (Inter, OFL)
-- Infra: jeden kontener (`docker-compose.yml` → `backend/Dockerfile`, build context = katalog główny repo)
+- Infra: jeden kontener, `backend/Dockerfile` (build context = katalog główny repo, kod tylko do odczytu, zapisywalne `/data` i `/tmp`)
+  - `docker-compose.yml` – wdrożenie z opublikowanego obrazu `ghcr.io/pbuzdygan/calico`; `docker-compose-local-build.yml` – budowanie i testy lokalne (te same opcje utwardzenia: `read_only`, `cap_drop`, `no-new-privileges`)
+  - `.github/workflows/ci.yml` – testy (push, PR, wywoływany też przez release); `.github/workflows/release.yml` – obraz amd64/arm64 **tylko** po publikacji release'u: tag `vX.Y.Z` z `main` → `:X.Y.Z` + `:latest`, tag `devX.Y.Z` z `dev` → `:devX.Y.Z` + `:dev_latest`; kanały się nie mieszają (walidacja tagu i gałęzi)
 
 ## Aktualny stan i backlog
 
@@ -39,8 +41,8 @@ Kluczowe decyzje produktowe (nie zmieniaj bez zgody właściciela):
 
 ```bash
 cp .env.example .env
-docker compose up --build -d      # http://localhost:8080, pierwszy start: utwórz użytkownika (D10)
-docker compose logs calico --tail=100
+docker compose -f docker-compose-local-build.yml up --build -d   # http://localhost:8380, pierwszy start: utwórz użytkownika (D10)
+docker compose -f docker-compose-local-build.yml logs calico --tail=100
 ```
 
 Testy (lokalnie zwykle nie ma Pythona z zależnościami — używaj kontenera):
@@ -82,5 +84,7 @@ Wszystko naraz, tak jak CI (`.github/workflows/ci.yml`: ruff + pytest + `node --
 - Kontrola: `node scripts/check_i18n.mjs` i `tests/test_i18n.py` (CI, `scripts/check.sh`) – brak tłumaczenia, martwy wpis albo polski tekst z pominięciem `t()` to błąd. Nie obchodź ich – dopisz tłumaczenie.
 - Frontend: każdy tekst z danych wstawiany do HTML przez `escapeHtml()` albo `textContent`. Komunikaty dla użytkownika przez `toast()`; akcje z przyciskami przez `withBusy()`.
 - Nie commituj `.env`, baz `*.db` ani plików z `/data`.
+- Nowa zmienna konfiguracji = pole w `app/config.py` + opis w `.env.example` (po angielsku: co robi, wartości, zalecenie dla instancji publicznej) + wiersz w tabeli „Configuration” w `README.md`. Nie dodawaj zmiennych, których kod nie czyta (tak było z `APP_ENV`).
+- Obraz jest publiczny i może być wystawiony do internetu: nie osłabiaj utwardzenia (nagłówki w `main.py`, limit rozmiaru zapytania, `read_only`/`cap_drop` w compose, użytkownik bez uprawnień w Dockerfile). Zależności Pythona sprawdzaj `pip-audit -r backend/requirements.txt` przed releasem.
 - Po zakończeniu zadania usuń je z zadań otwartych w `docs/decisions.md`; nowa decyzja właściciela = nowy wiersz w sekcji 1.
 - Zmiana widoczna dla użytkownika = wpis w `CHANGELOG.md` w tym samym commicie: po angielsku, w sekcji `## [Unreleased]` na górze (utwórz ją, jeśli nie ma), w podsekcji `New Features` / `Improvements` / `Bug Fixes`. Pisz nietechnicznie, z perspektywy użytkownika: co teraz może zrobić albo co działa lepiej (bez nazw endpointów, plików i ID zadań). Wydanie = zamiana `[Unreleased]` na numer wersji i datę.

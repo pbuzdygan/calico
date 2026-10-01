@@ -2,6 +2,17 @@
 
 All notable changes to CALICO are listed here, newest first, described from the user's point of view: what you can do now that you couldn't before, and what works better.
 
+## [Unreleased]
+
+### New Features
+
+- **Ready-made images for your server.** CALICO is now published as a container image for regular PCs and servers (amd64) and for ARM devices such as a Raspberry Pi 4 or 5 (arm64). You no longer have to build it yourself: download the compose file, run one command, and upgrade later with `docker compose pull`. Choose a stable version, or the development channel if you want to try new things early.
+
+### Improvements
+
+- **Safer to run on your network or the internet.** The server components were updated to fix known security issues. The app now refuses oversized requests, sends stricter browser security rules and reveals less about itself. The container runs with the minimum permissions it needs, so even a flaw in the app could not change its own files.
+- **Clearer setup.** Every setting in the example configuration file is explained in plain words, with recommendations for instances reachable from the internet. Settings that did nothing have been removed.
+
 ## [0.1.0] – 2026-10-01
 
 The first versioned release. Compared with the initial alpha (September 2026), CALICO has a new look, a guided plan that tells you whether your diet is working, your own data backup, and an English version.

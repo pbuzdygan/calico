@@ -54,7 +54,13 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.app_name, lifespan=lifespan)
+app = FastAPI(
+    title=settings.app_name,
+    lifespan=lifespan,
+    docs_url="/docs" if settings.api_docs else None,
+    redoc_url="/redoc" if settings.api_docs else None,
+    openapi_url="/openapi.json" if settings.api_docs else None,
+)
 
 if settings.cors_origin:
     app.add_middleware(
@@ -65,18 +71,31 @@ if settings.cors_origin:
     )
 
 
+def _body_too_large(request: Request) -> bool:
+    """Odrzuca zbyt duze zadania przed wczytaniem tresci (ochrona pamieci przy publicznym wystawieniu)."""
+    length = request.headers.get("content-length")
+    return bool(length and length.isdigit() and int(length) > settings.max_request_bytes)
+
+
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     # Jezyk komunikatow API: Accept-Language (frontend wysyla wybrany jezyk); kontekst dziedziczy endpoint.
     set_language(language_from_header(request.headers.get("accept-language")))
-    response = await call_next(request)
+    if _body_too_large(request):
+        response = JSONResponse(status_code=413, content={"detail": t("Zapytanie jest za duże.")})
+    else:
+        response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault(
         "Content-Security-Policy",
-        "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'",
+        "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; "
+        "base-uri 'self'; form-action 'self'; object-src 'none'",
     )
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()")
+    response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
     if request.url.path.startswith("/api/"):
         response.headers.setdefault("Cache-Control", "no-store")
     return response

@@ -1,17 +1,33 @@
+# Deployment from the published image (GitHub Container Registry).
+# Local build and testing: docker-compose-local-build.yml
+#
+# Image tags:
+#   :latest, :X.Y.Z          - stable releases (main branch)
+#   :dev_latest, :devX.Y.Z   - development releases (dev branch)
+# Pin a version (e.g. :0.1.0) for predictable upgrades.
 services:
   calico:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
+    image: ghcr.io/pbuzdygan/calico:latest
     env_file:
       - .env
     environment:
       - SQLITE_PATH=/data/calico.db
     ports:
+      # Behind a reverse proxy on the same host, publish on localhost only: "127.0.0.1:8380:8000"
       - "8380:8000"
     volumes:
       - calico_data:/data
     restart: unless-stopped
+    # Hardening: read-only root filesystem (only /data and /tmp are writable),
+    # no Linux capabilities, no privilege escalation, limited number of processes.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 100
 
 volumes:
   calico_data:

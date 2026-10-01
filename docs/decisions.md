@@ -33,6 +33,7 @@ Kolejność = rekomendowana kolejność realizacji. Jedno zadanie = jeden commit
 
 | ID | Zadanie | Kryterium akceptacji | Uwagi |
 |---|---|---|---|
+| T-PUB | **Utwardzenie pod instancje publiczne** (obraz jest publiczny; D6 zakłada LAN). Do decyzji: (a) ukrycie listy użytkowników przed zalogowaniem (logowanie nazwą + PIN-em zamiast wyboru z listy), (b) limit prób per IP obok blokady per konto (dziś każdy może zablokować konto błędnymi PIN-ami, a 4-cyfrowy PIN przy blokadzie maks. 60 min da się zgadnąć w kilka tygodni), (c) dłuższy minimalny PIN albo hasło, (d) token jednorazowy do utworzenia pierwszego konta (dziś pierwszy odwiedzający świeżą instancję zakłada konto). | decyzja właściciela, czy D6 zostaje | do czasu decyzji README opisuje ograniczenia i wymaga reverse proxy z TLS i dodatkowym uwierzytelnieniem |
 | T2.6 | **Kalibracja progów planu** w `plan.py` (tolerancja, 21/28 dni, krok 100–200 kcal) na realnych danych; ewentualnie podpowiedź oceny planu na „Dziś”. | — | najwcześniej po kilku tygodniach używania |
 
 Świadomie **nie** planujemy teraz: bazy produktów / wyszukiwarki „Add Food” z `docs/UI design.md`, powrotu do AI/NLP, soft delete wpisów, frameworka frontendowego, multi-tenant.

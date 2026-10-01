@@ -1,0 +1,29 @@
+# Local build and testing: docker compose -f docker-compose-local-build.yml up --build -d
+# Deployment from the published image: docker-compose.yml
+# Same hardening options as docker-compose.yml, so local tests match production behaviour.
+services:
+  calico:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: calico:local
+    env_file:
+      - .env
+    environment:
+      - SQLITE_PATH=/data/calico.db
+    ports:
+      - "8380:8000"
+    volumes:
+      - calico_data:/data
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 100
+
+volumes:
+  calico_data:

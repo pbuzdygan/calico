@@ -101,35 +101,69 @@ Text commands (whole message): `show today`, `undo`, `delete 2`, `help` (Polish:
 
 ## Getting started
 
+### Run the published image (recommended)
+
+Images are published to the GitHub Container Registry for `linux/amd64` and `linux/arm64` (e.g. Raspberry Pi 4/5 with a 64-bit OS). You only need `docker-compose.yml` and `.env.example` from this repository:
+
+```bash
+cp .env.example .env          # review the settings, see "Configuration" below
+docker compose up -d
+```
+
+Open `http://localhost:8380` (or `http://<server-ip>:8380` from another device on your network). On first launch there is no user and no default PIN – the app asks you to create the first user (name and PIN) and then requires completing the profile. The PIN can be changed in `Settings`.
+
+| Image tag | What it is |
+|---|---|
+| `ghcr.io/pbuzdygan/calico:latest` | newest stable release (from `main`) |
+| `ghcr.io/pbuzdygan/calico:X.Y.Z` | a specific stable release, e.g. `0.1.0` – pin this for predictable upgrades |
+| `ghcr.io/pbuzdygan/calico:dev_latest` | newest development release (from `dev`) – may be unstable |
+| `ghcr.io/pbuzdygan/calico:devX.Y.Z` | a specific development release, e.g. `dev0.2.0` |
+
+Upgrade: `docker compose pull && docker compose up -d`. The database is migrated automatically on start (schema version in the `app_meta` table, key `schema_version`). Export your data from `Settings` before upgrading – there is no automatic backup.
+
+### Build locally (development)
+
 ```bash
 cp .env.example .env
-docker compose up --build -d
+docker compose -f docker-compose-local-build.yml up --build -d
+docker compose -f docker-compose-local-build.yml logs calico --tail=100
 ```
 
-Open `http://localhost:8080`. On first launch there is no user and no default PIN – the app asks you to create the first user (name and PIN) and then requires completing the profile. The PIN can be changed in `Settings`.
+`docker-compose-local-build.yml` builds the image from the source (`backend/Dockerfile`, build context = repository root) with the same hardening options as the deployment file, so local tests match production behaviour.
 
-Existing installations keep their users (including the former "Domyślny Użytkownik" default user – it can be deleted after creating your own account). The `DEFAULT_USER_PIN` key in `.env` is ignored and can be removed.
+### Notes
 
-The app runs in a single container: FastAPI serves both the API and the frontend files. Data is stored in the `calico_data` volume (`/data/calico.db`).
+- The app runs in a single container: FastAPI serves both the API and the frontend files. Data is stored in the `calico_data` volume (`/data/calico.db`). The container runs as an unprivileged user (UID 1000) with a read-only root filesystem; only `/data` and `/tmp` are writable.
+- Existing installations keep their users (including the former "Domyślny Użytkownik" default user – it can be deleted after creating your own account). Old keys in `.env` (`APP_ENV`, `DEFAULT_USER_PIN`, `ADMIN_PIN`, `DIAGNOSTICS_PATH`) are ignored and can be removed.
+- Upgrading from the old Caddy-based version (two containers, `backend` + `proxy`): add `--remove-orphans` to the first `docker compose up`. The data volume stays the same.
 
-Upgrading from the Caddy-based version (two containers, `backend` + `proxy`):
+## Releases
 
-```bash
-docker compose up --build -d --remove-orphans
-```
+Container images are built **only when a GitHub release is published** – never on a push. Pushes and pull requests run the tests only (`.github/workflows/ci.yml`). The release tag decides the channel (`.github/workflows/release.yml`):
 
-The data volume stays the same. On first start the database is migrated automatically (schema version in the `app_meta` table, key `schema_version`).
+| Release tag | Must point to a commit on | Image tags |
+|---|---|---|
+| `vX.Y.Z`, e.g. `v0.1.0` | `main` | `:X.Y.Z`, `:latest` |
+| `devX.Y.Z`, e.g. `dev0.2.0`, `dev0.2.0-rc1` | `dev` | `:devX.Y.Z`, `:dev_latest` |
+
+The workflow runs the tests first and stops before pushing anything if the tag matches neither pattern, if the tagged commit is not on the channel's branch, or if a stable tag is published as a pre-release. Mark dev releases as pre-releases so GitHub keeps showing the latest stable one as "Latest". Stable and dev images never share tags or build cache.
+
+Releasing: update `CHANGELOG.md` (rename `[Unreleased]` to the version and date), merge, then create the release in GitHub with a new tag on the right branch. After the first release, make the package public once in GitHub → Packages → `calico` → Package settings → Change visibility (new GHCR packages are private).
 
 ## Configuration (`.env`)
 
+Every key is optional; `.env.example` explains each one in detail.
+
 | Variable | Default | Description |
 |---|---|---|
-| `APP_TIMEZONE` | `Europe/Warsaw` | time zone used to determine "today" |
-| `SQLITE_PATH` | `/data/calico.db` | database path |
-| `CORS_ORIGIN` | empty | empty = no CORS (frontend and API on the same origin) |
-| `ALLOW_SIGNUP` | `true` | `false` = new accounts can only be created on first launch (when no user exists); `POST /api/users` then returns `403` |
+| `APP_TIMEZONE` | `Europe/Warsaw` | time zone used to determine "today" (IANA name) |
+| `SQLITE_PATH` | `/data/calico.db` | database path; both compose files set it to the data volume |
+| `ALLOW_SIGNUP` | `true` | `false` = new accounts can only be created on first launch (when no user exists); `POST /api/users` then returns `403`. Use `false` on any internet-facing instance |
 | `SESSION_TTL_HOURS` | `12` | how long a session stays valid after a PIN unlock |
 | `SESSION_SECRET` | empty | session signing key; empty = generated automatically and stored in the database |
+| `CORS_ORIGIN` | empty | empty = no CORS (frontend and API on the same origin) |
+| `API_DOCS` | `false` | `true` = interactive API documentation at `/docs`, `/redoc`, `/openapi.json` |
+| `MAX_REQUEST_BYTES` | `4194304` | requests with a larger body are rejected with `413` |
 
 ## API
 
@@ -184,16 +218,37 @@ docker run --rm -v "$PWD:/app" -w /app -e PYTHONPATH=/app python:3.12-slim \
   sh -c "pip install -q -r requirements.txt -r requirements-dev.txt && pytest -q -p no:cacheprovider"
 ```
 
-Full check as in CI (ruff + pytest in a container, `node --check` of frontend modules locally): `./scripts/check.sh`. CI (GitHub Actions) runs the same on pushes to `dev`/`main` and on every PR.
+Full check as in CI (ruff + pytest in a container, `node --check` of frontend modules locally): `./scripts/check.sh`. CI (GitHub Actions) runs the same on pushes to `dev`/`main`, on every PR and before every release image build.
 
 ## Security
 
-- The app is meant for a home network. Do not expose it to the internet without a reverse proxy with TLS and additional authentication.
-- PIN hashed with PBKDF2-SHA256 (120k iterations), constant-time comparison.
-- After 5 failed PINs the account is temporarily locked (5 → 10 → 20 → 40 → 60 min). `ALLOW_SIGNUP=false` prevents anyone on the network from creating more accounts.
-- After unlocking, the browser receives a signed session token (HMAC-SHA256, valid for 12 h) and keeps it in `sessionStorage`: the session survives a tab reload (e.g. when a phone suspends the browser in the background) and disappears when the tab is closed or on logout. The PIN is never stored. Changing the PIN invalidates all earlier sessions.
-- `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` headers.
+CALICO was designed for a home network. What it protects against, and what you need to add yourself before exposing it to the internet:
+
+**Built in**
+
+- PIN hashed with PBKDF2-SHA256 (120k iterations), constant-time comparison. The PIN is never stored in the browser.
+- After 5 failed PINs the account is temporarily locked (5 → 10 → 20 → 40 → 60 min).
+- After unlocking, the browser receives a signed session token (HMAC-SHA256, valid for `SESSION_TTL_HOURS`) kept in `sessionStorage`: the session survives a tab reload (e.g. when a phone suspends the browser in the background) and disappears when the tab is closed or on logout. Changing the PIN invalidates all earlier sessions.
+- `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy` headers; no `Server` header; API documentation disabled by default; request body size limit.
+- Container: unprivileged user, read-only root filesystem, all Linux capabilities dropped, `no-new-privileges` (see `docker-compose.yml`).
 - SQLite in `WAL` mode, `foreign_keys=ON`; secrets kept out of the repo (`.env` in `.gitignore`).
+
+**Known limits** – acceptable on a trusted home network, not on the open internet:
+
+- The login screen lists all user names (`GET /api/users` needs no authentication).
+- A 4-digit PIN with the lockout above can be guessed in weeks by a determined attacker, and anyone can lock an account out by entering wrong PINs. There is no per-IP rate limiting.
+- The app speaks plain HTTP; it has no TLS of its own.
+- On a fresh instance, whoever opens it first creates the first account.
+
+**If you host it on the internet**, put it behind a reverse proxy (Caddy, nginx, Traefik) that provides:
+
+1. HTTPS with a valid certificate (and HSTS),
+2. an extra authentication layer in front of the whole app – e.g. a VPN (WireGuard, Tailscale), an identity-aware proxy (Authelia, Authentik, Cloudflare Access) or at least HTTP basic auth,
+3. request rate limiting and a request size limit.
+
+Also: create all accounts first, then set `ALLOW_SIGNUP=false`; publish the container port on localhost only (`"127.0.0.1:8380:8000"`); use 6–8 digit PINs. CALICO stores health data (weight, diet) – if you host it for other people, you are responsible for protecting it.
+
+Reporting vulnerabilities: see [`SECURITY.md`](SECURITY.md).
 
 ## Project documentation
 

@@ -30,6 +30,7 @@ MESSAGES: dict[str, str] = {
     ),
     "calico-szablon-importu.csv": "calico-import-template.csv",
     "Plik jest pusty.": "The file is empty.",
+    "Zapytanie jest za duże.": "The request is too large.",
     "Brak kolumny „Data”. Pobierz szablon z aplikacji.": "Missing “Date” column. Download the template from the app.",
     "Brak daty.": "Missing date.",
     "Podano makroskładniki bez kalorii – uzupełnij kolumnę „Kalorie”.": "Macros given without calories – fill in the “Calories” column.",

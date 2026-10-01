@@ -1,10 +1,15 @@
 # T3.7: testy i lint przy kazdym pushu na dev/main i w kazdym PR.
 name: CI
 
+# Testy, nie obraz: obraz budowany wylacznie przy publikacji release'u (release.yml, ktory wywoluje ten workflow).
 on:
   push:
     branches: [dev, main]
   pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   backend:
@@ -13,8 +18,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -32,8 +37,8 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
       - name: node --check (moduly ES)
