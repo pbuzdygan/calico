@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from . import clock
 from .config import settings
+from .i18n import get_language, t, use_language
 from .models import AppMeta, DayEntry, DayLog, Profile, User
 from .schemas import (
     DayDetailOut,
@@ -47,7 +48,7 @@ class PinLockedError(Exception):
     def __init__(self, retry_after_seconds: int):
         self.retry_after_seconds = retry_after_seconds
         minutes = max(1, -(-retry_after_seconds // 60))
-        super().__init__(f"Za dużo błędnych prób PIN-u. Spróbuj ponownie za {minutes} min.")
+        super().__init__(t("Za dużo błędnych prób PIN-u. Spróbuj ponownie za {minutes} min.", minutes=minutes))
 
 
 class NotFoundError(LookupError):
@@ -104,6 +105,7 @@ SINGLE_ENTRY_TYPES = {"weight", "waist", "daily_balance"}
 MACRO_FIELDS = ("kcal", "carbs_g", "fat_g", "protein_g")
 VALUE_FIELDS = MACRO_FIELDS + ("weight_kg", "waist_cm")
 
+# Naglowki szablonow po _normalize_text: polskie i angielskie (parser przyjmuje oba jezyki).
 HEADER_MAP = {
     "waga": "weight",
     "obwod pasa": "waist",
@@ -112,6 +114,14 @@ HEADER_MAP = {
     "kolacja": "dinner",
     "przekaska": "snack",
     "bilans dnia": "daily_balance",
+    "weight": "weight",
+    "waist": "waist",
+    "waist circumference": "waist",
+    "breakfast": "breakfast",
+    "lunch": "lunch",
+    "dinner": "dinner",
+    "snack": "snack",
+    "daily balance": "daily_balance",
 }
 
 FIELD_ALIASES = {
@@ -121,6 +131,12 @@ FIELD_ALIASES = {
     "weglowodany": "carbs_g",
     "tluszcze": "fat_g",
     "bialko": "protein_g",
+    "calories": "kcal",
+    "carbs": "carbs_g",
+    "carbohydrates": "carbs_g",
+    "fat": "fat_g",
+    "fats": "fat_g",
+    "protein": "protein_g",
 }
 
 FIELD_LABELS = {
@@ -163,9 +179,9 @@ ORDINALS = {
 }
 
 COMMAND_HELP = {"pomoc", "help", "co umiesz"}
-COMMAND_SHOW_TODAY = {"pokaz dzis", "pokaz dzien", "stan dnia", "podsumuj dzien", "podsumowanie dnia", "pokaz podsumowanie"}
-COMMAND_UNDO = {"cofnij ostatni", "cofnij wpis", "undo"}
-DELETE_POSITION_PATTERN = re.compile(r"usun(?: pozycje)?(?: nr)? (\d+)")
+COMMAND_SHOW_TODAY = {"pokaz dzis", "pokaz dzien", "stan dnia", "podsumuj dzien", "podsumowanie dnia", "pokaz podsumowanie", "show today", "today"}
+COMMAND_UNDO = {"cofnij ostatni", "cofnij wpis", "undo", "undo last"}
+DELETE_POSITION_PATTERN = re.compile(r"(?:usun(?: pozycje)?(?: nr)?|delete(?: item)?) (\d+)")
 NUMBER_PATTERN = re.compile(r"^(\d+(?:[.,]\d+)?)\s*(kg|cm|kcal|g)?$", flags=re.IGNORECASE)
 
 
@@ -176,11 +192,11 @@ def fmt_number(value: float | None, decimals: int = 1) -> str:
     if value is None:
         return "-"
     text = f"{round(value, decimals):.{decimals}f}".rstrip("0").rstrip(".")
-    return text.replace(".", ",")
+    return text.replace(".", ",") if get_language() == "pl" else text
 
 
 def fmt_date(value: date) -> str:
-    return value.strftime("%d.%m.%Y")
+    return value.strftime("%d.%m.%Y" if get_language() == "pl" else "%d/%m/%Y")
 
 
 # --- parser szablonow ---------------------------------------------------------
@@ -213,8 +229,10 @@ def _parse_number(raw: str, field: str) -> float:
     value = raw.strip()
     match = NUMBER_PATTERN.fullmatch(value)
     if not match:
-        example = "82,4" if field in ("weight_kg", "waist_cm") else "540"
-        raise InputError(f"Niepoprawna wartość pola '{FIELD_LABELS[field]}': '{value}'. Podaj liczbę nieujemną, np. {example}.")
+        example = fmt_number(82.4) if field in ("weight_kg", "waist_cm") else "540"
+        raise InputError(
+            t("Niepoprawna wartość pola '{field}': '{value}'. Podaj liczbę nieujemną, np. {example}.", field=t(FIELD_LABELS[field]), value=value, example=example)
+        )
     return float(match.group(1).replace(",", "."))
 
 
@@ -225,11 +243,11 @@ def parse_date_value(raw: str) -> date:
             return datetime.strptime(value, pattern).date()
         except ValueError:
             continue
-    raise InputError("Niepoprawny format daty. Użyj RRRR-MM-DD, DD.MM.RRRR, DD-MM-RRRR albo DD/MM/RRRR.")
+    raise InputError(t("Niepoprawny format daty. Użyj RRRR-MM-DD, DD.MM.RRRR, DD-MM-RRRR albo DD/MM/RRRR."))
 
 
 def _extract_optional_date(lines: list[str]) -> tuple[date | None, list[str]]:
-    if lines and _normalize_text(lines[0]).startswith("data:"):
+    if lines and _normalize_text(lines[0]).startswith(("data:", "date:")):
         _, _, value = lines[0].partition(":")
         return parse_date_value(value), lines[1:]
     return None, lines
@@ -243,15 +261,13 @@ def parse_template_message(message: str) -> ParsedEntryInput:
     lines = [line.strip() for line in message.splitlines() if line.strip()]
     log_date, lines = _extract_optional_date(lines)
     if not lines:
-        raise InputError("Brak treści wpisu. Użyj jednego z gotowych szablonów.")
+        raise InputError(t("Brak treści wpisu. Użyj jednego z gotowych szablonów."))
 
     header_key, _, header_value = lines[0].partition(":")
     entry_type = HEADER_MAP.get(_normalize_text(header_key))
     if not entry_type:
-        raise InputError(
-            "Nie rozpoznano typu wpisu. Użyj jednego z nagłówków: Waga, Obwód pasa, Śniadanie, Obiad, Kolacja, Przekąska, Bilans dnia."
-        )
-    label = ENTRY_TYPE_LABELS[entry_type]
+        raise InputError(t("Nie rozpoznano typu wpisu. Użyj jednego z nagłówków: {headers}.", headers=_entry_type_names()))
+    label = t(ENTRY_TYPE_LABELS[entry_type])
 
     if entry_type in MEASUREMENT_FIELDS:
         field = MEASUREMENT_FIELDS[entry_type]
@@ -259,41 +275,44 @@ def parse_template_message(message: str) -> ParsedEntryInput:
         if header_value.strip():
             raw_value = header_value
         else:
-            example = f"{label}: 82,4 kg" if entry_type == "weight" else f"{label}: 91 cm"
+            example = f"{label}: {fmt_number(82.4)} kg" if entry_type == "weight" else f"{label}: 91 cm"
             if not rest:
-                raise InputError(f"Podaj wartość w formacie '{example}'.")
+                raise InputError(t("Podaj wartość w formacie '{example}'.", example=example))
             second_key, _, second_value = rest[0].partition(":")
             if HEADER_MAP.get(_normalize_text(second_key)) != entry_type or not second_value.strip():
-                raise InputError(f"Podaj wartość w formacie '{example}'.")
+                raise InputError(t("Podaj wartość w formacie '{example}'.", example=example))
             raw_value = second_value
             rest = rest[1:]
         if rest:
-            raise InputError(f"Nieoczekiwana linia we wpisie '{label}': '{rest[0]}'.")
+            raise InputError(t("Nieoczekiwana linia we wpisie '{label}': '{line}'.", label=label, line=rest[0]))
         parsed = ParsedEntryInput(entry_type=entry_type, log_date=log_date, **{field: _parse_number(raw_value, field)})
         validate_entry_input(parsed)
         return parsed
 
     if header_value.strip():
-        raise InputError(f"Nagłówek '{label}' zapisz w osobnej linii, a wartości w kolejnych liniach:\n\n{_meal_template_help(entry_type)}")
+        raise InputError(
+            t("Nagłówek '{label}' zapisz w osobnej linii, a wartości w kolejnych liniach:\n\n{example}", label=label, example=_meal_template_help(entry_type))
+        )
 
     values: dict[str, float] = {}
     for line in lines[1:]:
         if ":" not in line:
-            raise InputError(f"Niepoprawna linia: '{line}'. Każda wartość musi mieć format 'Pole: liczba'.")
+            raise InputError(t("Niepoprawna linia: '{line}'. Każda wartość musi mieć format 'Pole: liczba'.", line=line))
         key, _, raw_value = line.partition(":")
         alias = FIELD_ALIASES.get(_normalize_text(key))
         if not alias:
-            raise InputError(f"Nieznane pole '{key.strip()}'. Użyj: Ilość kalorii, Węglowodany, Tłuszcze, Białko.")
+            fields = ", ".join(t(FIELD_LABELS[field]) for field in MACRO_FIELDS)
+            raise InputError(t("Nieznane pole '{field}'. Użyj: {fields}.", field=key.strip(), fields=fields))
         if alias in values:
-            raise InputError(f"Pole '{FIELD_LABELS[alias]}' podano więcej niż raz.")
+            raise InputError(t("Pole '{field}' podano więcej niż raz.", field=t(FIELD_LABELS[alias])))
         if not raw_value.strip():
-            raise InputError(f"Brak wartości dla pola '{FIELD_LABELS[alias]}'.")
+            raise InputError(t("Brak wartości dla pola '{field}'.", field=t(FIELD_LABELS[alias])))
         values[alias] = _parse_number(raw_value, alias)
 
     missing = [field for field in MACRO_FIELDS if field not in values]
     if missing:
-        missing_labels = ", ".join(FIELD_LABELS[field] for field in missing)
-        raise InputError(f"Brakuje pól: {missing_labels}. Wzór:\n\n{_meal_template_help(entry_type)}")
+        missing_labels = ", ".join(t(FIELD_LABELS[field]) for field in missing)
+        raise InputError(t("Brakuje pól: {fields}. Wzór:\n\n{example}", fields=missing_labels, example=_meal_template_help(entry_type)))
 
     parsed = ParsedEntryInput(entry_type=entry_type, log_date=log_date, **values)
     validate_entry_input(parsed)
@@ -303,9 +322,9 @@ def parse_template_message(message: str) -> ParsedEntryInput:
 def entry_input_from_values(payload: EntryValuesIn, log_date: date | None = None) -> ParsedEntryInput:
     required = (MEASUREMENT_FIELDS[payload.entry_type],) if payload.entry_type in MEASUREMENT_FIELDS else MACRO_FIELDS
     values = {field: getattr(payload, field) for field in required}
-    missing = [FIELD_LABELS[field] for field, value in values.items() if value is None]
+    missing = [t(FIELD_LABELS[field]) for field, value in values.items() if value is None]
     if missing:
-        raise InputError(f"Brakuje pól: {', '.join(missing)}.")
+        raise InputError(t("Brakuje pól: {fields}.", fields=", ".join(missing)))
     parsed = ParsedEntryInput(entry_type=payload.entry_type, log_date=log_date, **values)
     validate_entry_input(parsed)
     return parsed
@@ -314,9 +333,11 @@ def entry_input_from_values(payload: EntryValuesIn, log_date: date | None = None
 def validate_log_date(value: date) -> None:
     latest = clock.today() + timedelta(days=MAX_FUTURE_DAYS)
     if value < MIN_LOG_DATE:
-        raise InputError(f"Data {fmt_date(value)} jest zbyt odległa. Najwcześniejsza dozwolona data to {fmt_date(MIN_LOG_DATE)}.")
+        raise InputError(
+            t("Data {date} jest zbyt odległa. Najwcześniejsza dozwolona data to {earliest}.", date=fmt_date(value), earliest=fmt_date(MIN_LOG_DATE))
+        )
     if value > latest:
-        raise InputError(f"Data {fmt_date(value)} jest z przyszłości. Najpóźniejsza dozwolona data to {fmt_date(latest)}.")
+        raise InputError(t("Data {date} jest z przyszłości. Najpóźniejsza dozwolona data to {latest}.", date=fmt_date(value), latest=fmt_date(latest)))
 
 
 def validate_entry_input(payload: ParsedEntryInput) -> None:
@@ -327,24 +348,41 @@ def validate_entry_input(payload: ParsedEntryInput) -> None:
         if not low <= value <= high:
             unit = FIELD_UNITS[field]
             raise InputError(
-                f"Wartość pola '{FIELD_LABELS[field]}' ({fmt_number(value)} {unit}) jest poza zakresem "
-                f"{fmt_number(low)}-{fmt_number(high)} {unit}."
+                t(
+                    "Wartość pola '{field}' ({value} {unit}) jest poza zakresem {low}-{high} {unit}.",
+                    field=t(FIELD_LABELS[field]),
+                    value=fmt_number(value),
+                    unit=unit,
+                    low=fmt_number(low),
+                    high=fmt_number(high),
+                )
             )
     if payload.log_date is not None:
         validate_log_date(payload.log_date)
 
 
 def build_source_text(entry_type: str, values: dict[str, float | None]) -> str:
-    label = ENTRY_TYPE_LABELS[entry_type]
+    """Tekst szablonu w jezyku zadania (podpowiedzi, odpowiedzi API)."""
+    label = t(ENTRY_TYPE_LABELS[entry_type])
     if entry_type in MEASUREMENT_FIELDS:
         field = MEASUREMENT_FIELDS[entry_type]
         return f"{label}: {fmt_number(values.get(field))} {FIELD_UNITS[field]}"
-    lines = [label] + [f"{FIELD_LABELS[field]}: {fmt_number(values.get(field))}" for field in MACRO_FIELDS]
+    lines = [label] + [f"{t(FIELD_LABELS[field])}: {fmt_number(values.get(field))}" for field in MACRO_FIELDS]
     return "\n".join(lines)
 
 
 def build_source_text_for_entry(entry: DayEntry) -> str:
     return build_source_text(entry.entry_type, {field: getattr(entry, field) for field in VALUE_FIELDS})
+
+
+def canonical_source_text(entry_type: str, values: dict[str, float | None]) -> str:
+    """source_text zapisywany w bazie zawsze po polsku (niezaleznie od jezyka zadania)."""
+    with use_language("pl"):
+        return build_source_text(entry_type, values)
+
+
+def _entry_type_names() -> str:
+    return ", ".join(t(ENTRY_TYPE_LABELS[entry_type]) for entry_type in ENTRY_TYPE_LABELS)
 
 
 # --- profil i cel kcal --------------------------------------------------------
@@ -431,9 +469,9 @@ def set_plan_start(db: Session, profile: Profile, started_on: date) -> None:
     po starcie; bez pomiarow - dotychczasowa waga planu.
     """
     if started_on > clock.today():
-        raise InputError("Start planu nie może być w przyszłości.")
+        raise InputError(t("Start planu nie może być w przyszłości."))
     if started_on < MIN_LOG_DATE:
-        raise InputError(f"Start planu nie może być wcześniejszy niż {fmt_date(MIN_LOG_DATE)}.")
+        raise InputError(t("Start planu nie może być wcześniejszy niż {date}.", date=fmt_date(MIN_LOG_DATE)))
     window = PLAN_START_WEIGHT_DAYS - 1
     before = weights_between(db, profile.user_id, started_on - timedelta(days=window), started_on)
     after = weights_between(db, profile.user_id, started_on, started_on + timedelta(days=window))
@@ -535,9 +573,9 @@ def signup_allowed(db: Session) -> bool:
 
 def create_user(db: Session, display_name: str, pin: str) -> User:
     if not signup_allowed(db):
-        raise ForbiddenError("Zakładanie nowych kont jest wyłączone (ALLOW_SIGNUP=false).")
+        raise ForbiddenError(t("Zakładanie nowych kont jest wyłączone (ALLOW_SIGNUP=false)."))
     if not validate_pin(pin):
-        raise InputError("PIN musi mieć 4-8 cyfr.")
+        raise InputError(t("PIN musi mieć 4-8 cyfr."))
     display_name = display_name.strip()
     slug_base = slugify(display_name)[:50] or "user"
     slug = slug_base
@@ -613,8 +651,13 @@ def user_from_session(db: Session, user_id: int, token: str) -> User | None:
 
 def change_user_pin(db: Session, user: User, new_pin: str) -> None:
     if not validate_pin(new_pin):
-        raise InputError("PIN musi mieć 4-8 cyfr.")
+        raise InputError(t("PIN musi mieć 4-8 cyfr."))
     user.pin_hash = hash_pin(new_pin)
+    db.flush()
+
+
+def set_user_language(db: Session, user: User, language: str) -> None:
+    user.language = language
     db.flush()
 
 
@@ -666,6 +709,26 @@ def _entry_meal_label(entry_type: str, count: int) -> str:
     if not ordinal:
         return f"{base} #{count}"
     return f"{base} {ordinal[MEAL_GENDER[entry_type]]}"
+
+
+def _entry_ordinal(entry: DayEntry) -> int:
+    """Numer kolejny posilku danego typu z kanonicznej (polskiej) etykiety, np. 'Kolacja Druga' -> 2."""
+    if entry.entry_type not in MEAL_ENTRY_TYPES:
+        return 1
+    for count in range(2, max(ORDINALS) + 1):
+        if entry.entry_label == _entry_meal_label(entry.entry_type, count):
+            return count
+    match = re.search(r"#(\d+)$", entry.entry_label or "")
+    return int(match.group(1)) if match else 1
+
+
+def display_entry_label(entry: DayEntry) -> str:
+    """Etykieta w jezyku zadania. W bazie etykiety sa po polsku (kanoniczne); EN: 'Dinner 2'."""
+    if get_language() == "pl":
+        return entry.entry_label
+    base = t(ENTRY_TYPE_LABELS[entry.entry_type])
+    ordinal = _entry_ordinal(entry)
+    return base if ordinal == 1 else f"{base} {ordinal}"
 
 
 def refresh_day(db: Session, day_log: DayLog) -> list[DayEntry]:
@@ -740,8 +803,8 @@ def _entry_out(entry: DayEntry, position: int) -> DayEntryOut:
         id=entry.id,
         position=position,
         entry_type=entry.entry_type,
-        entry_label=entry.entry_label,
-        source_text=entry.source_text,
+        entry_label=display_entry_label(entry),
+        source_text=build_source_text_for_entry(entry),
         kcal=rounded(entry.kcal),
         carbs_g=rounded(entry.carbs_g),
         fat_g=rounded(entry.fat_g),
@@ -795,7 +858,7 @@ def _apply_values(entry: DayEntry, payload: ParsedEntryInput) -> None:
     entry.entry_type = payload.entry_type
     for field, value in payload.values().items():
         setattr(entry, field, value)
-    entry.source_text = build_source_text(payload.entry_type, payload.values())
+    entry.source_text = canonical_source_text(payload.entry_type, payload.values())
     entry.updated_at = clock.utcnow_naive()
 
 
@@ -831,7 +894,7 @@ def get_entry(db: Session, user_id: int, log_date: date, entry_id: int) -> DayEn
         select(DayEntry).join(DayLog).where(DayLog.user_id == user_id, DayLog.log_date == log_date, DayEntry.id == entry_id)
     )
     if not entry:
-        raise NotFoundError("Nie znaleziono pozycji.")
+        raise NotFoundError(t("Nie znaleziono pozycji."))
     return entry
 
 
@@ -840,7 +903,11 @@ def _ensure_single_slot_free(db: Session, day_log: DayLog, entry_type: str, excl
         return
     if _single_entry_for_type(db, day_log, entry_type, exclude_entry_id=exclude_entry_id):
         raise ConflictError(
-            f"W dniu {fmt_date(day_log.log_date)} jest już wpis '{ENTRY_TYPE_LABELS[entry_type]}'. Edytuj go zamiast tworzyć drugi."
+            t(
+                "W dniu {date} jest już wpis '{label}'. Edytuj go zamiast tworzyć drugi.",
+                date=fmt_date(day_log.log_date),
+                label=t(ENTRY_TYPE_LABELS[entry_type]),
+            )
         )
 
 
@@ -931,7 +998,7 @@ def report_for_range(db: Session, user_id: int, date_from: date, date_to: date) 
     if date_to < date_from:
         date_from, date_to = date_to, date_from
     if (date_to - date_from).days + 1 > MAX_REPORT_DAYS:
-        raise InputError(f"Zakres raportu może mieć najwyżej {MAX_REPORT_DAYS} dni.")
+        raise InputError(t("Zakres raportu może mieć najwyżej {days} dni.", days=MAX_REPORT_DAYS))
 
     day_logs = db.scalars(
         select(DayLog)
@@ -1008,7 +1075,7 @@ def last_days_range(days: int) -> tuple[date, date]:
 def parse_month_to_range(month_value: str) -> tuple[date, date]:
     match = re.fullmatch(r"(\d{4})-(\d{2})", month_value.strip())
     if not match or not 1 <= int(match.group(2)) <= 12:
-        raise InputError("Niepoprawny format miesiąca. Użyj RRRR-MM.")
+        raise InputError(t("Niepoprawny format miesiąca. Użyj RRRR-MM."))
     year, month = int(match.group(1)), int(match.group(2))
     return date(year, month, 1), date(year, month, monthrange(year, month)[1])
 
@@ -1018,7 +1085,8 @@ def parse_month_to_range(month_value: str) -> tuple[date, date]:
 
 # --- eksport / import "wiersz = dzien" (D11) -----------------------------------------------------------
 
-# Jeden format dla szablonu, eksportu i importu: srednik (Excel PL), UTF-8 z BOM, przecinek dziesietny.
+# Jeden format dla szablonu, eksportu i importu, UTF-8 z BOM. Naglowki w jezyku uzytkownika; PL: srednik i przecinek
+# dziesietny (Excel PL), EN: przecinek i kropka. Import przyjmuje oba jezyki i oba separatory.
 IO_COLUMNS = (
     ("log_date", "Data"),
     ("weight_kg", "Waga (kg)"),
@@ -1043,6 +1111,17 @@ IO_HEADER_ALIASES = {
     "wegle": "carbs_g",
     "tluszcze": "fat_g",
     "tluszcz": "fat_g",
+    "date": "log_date",
+    "day": "log_date",
+    "weight": "weight_kg",
+    "waist": "waist_cm",
+    "waist circumference": "waist_cm",
+    "calories": "kcal",
+    "protein": "protein_g",
+    "carbs": "carbs_g",
+    "carbohydrates": "carbs_g",
+    "fat": "fat_g",
+    "fats": "fat_g",
 }
 IO_DELIMITER = ";"
 IO_COMMENT = "#"
@@ -1053,7 +1132,8 @@ IMPORT_MAX_ERRORS_SHOWN = 50
 
 def _csv_document(rows: list[list[str]]) -> str:
     buffer = io.StringIO()
-    csv.writer(buffer, delimiter=IO_DELIMITER, lineterminator="\r\n").writerows(rows)
+    delimiter = IO_DELIMITER if get_language() == "pl" else ","
+    csv.writer(buffer, delimiter=delimiter, lineterminator="\r\n").writerows(rows)
     return "\ufeff" + buffer.getvalue()
 
 
@@ -1061,13 +1141,17 @@ def _io_number(value: float | None, decimals: int) -> str:
     return "" if value is None else fmt_number(value, decimals)
 
 
+def _io_header() -> list[str]:
+    return [t(label) for _, label in IO_COLUMNS]
+
+
 def import_template_csv() -> str:
     """Pusty formularz do wypelnienia; wiersze zaczynajace sie od # sa pomijane przy imporcie."""
     return _csv_document(
         [
-            [label for _, label in IO_COLUMNS],
-            ["# Przykład – jeden wiersz na dzień, puste komórki są pomijane. Wiersze zaczynające się od # są ignorowane.", "", "", "", "", "", ""],
-            ["# 2026-09-01", "91,2", "", "2150", "140", "210", "70"],
+            _io_header(),
+            [t("# Przykład – jeden wiersz na dzień, puste komórki są pomijane. Wiersze zaczynające się od # są ignorowane."), "", "", "", "", "", ""],
+            ["# 2026-09-01", fmt_number(91.2), "", "2150", "140", "210", "70"],
             ["# 2026-09-02", "", "102", "1980", "", "", ""],
         ]
     )
@@ -1078,7 +1162,7 @@ def export_days_csv(db: Session, user_id: int) -> str:
     day_logs = db.scalars(
         select(DayLog).where(DayLog.user_id == user_id).options(selectinload(DayLog.entries)).order_by(DayLog.log_date.asc())
     ).all()
-    rows = [[label for _, label in IO_COLUMNS]]
+    rows = [_io_header()]
     for day_log in day_logs:
         if not day_log.entries:
             continue
@@ -1110,7 +1194,7 @@ def _io_rows(content: str) -> list[list[str]]:
     text = content.lstrip("\ufeff")
     first_line = next((line for line in text.splitlines() if line.strip()), "")
     if not first_line:
-        raise InputError("Plik jest pusty.")
+        raise InputError(t("Plik jest pusty."))
     try:
         delimiter = csv.Sniffer().sniff(first_line, delimiters=";,\t").delimiter
     except csv.Error:
@@ -1125,19 +1209,19 @@ def _io_columns(header: list[str]) -> dict[str, int]:
             continue
         key = _io_header_key(name)
         if key is None:
-            expected = ", ".join(label for _, label in IO_COLUMNS)
-            raise InputError(f"Nieznana kolumna „{name}”. Dozwolone kolumny: {expected}. Pobierz szablon z aplikacji.")
+            expected = ", ".join(_io_header())
+            raise InputError(t("Nieznana kolumna „{name}”. Dozwolone kolumny: {expected}. Pobierz szablon z aplikacji.", name=name, expected=expected))
         if key in columns:
-            raise InputError(f"Kolumna „{name}” występuje w pliku więcej niż raz.")
+            raise InputError(t("Kolumna „{name}” występuje w pliku więcej niż raz.", name=name))
         columns[key] = index
     if "log_date" not in columns:
-        raise InputError("Brak kolumny „Data”. Pobierz szablon z aplikacji.")
+        raise InputError(t("Brak kolumny „Data”. Pobierz szablon z aplikacji."))
     return columns
 
 
 def _io_parse_row(values: dict[str, str]) -> tuple[date, list[ParsedEntryInput]]:
     if not values.get("log_date"):
-        raise InputError("Brak daty.")
+        raise InputError(t("Brak daty."))
     log_date = parse_date_value(values["log_date"])
     validate_log_date(log_date)
     numbers = {}
@@ -1146,7 +1230,7 @@ def _io_parse_row(values: dict[str, str]) -> tuple[date, list[ParsedEntryInput]]
         if raw:
             numbers[field] = _parse_number(raw, field)
     if any(field in numbers for field in IO_FOOD_FIELDS) and "kcal" not in numbers:
-        raise InputError("Podano makroskładniki bez kalorii – uzupełnij kolumnę „Kalorie”.")
+        raise InputError(t("Podano makroskładniki bez kalorii – uzupełnij kolumnę „Kalorie”."))
     entries = []
     for entry_type, field in MEASUREMENT_FIELDS.items():
         if field in numbers:
@@ -1168,11 +1252,11 @@ def import_days_csv(db: Session, user_id: int, content: str) -> ImportResultOut:
     rows = _io_rows(content)
     data_rows = [(number, row) for number, row in enumerate(rows, start=1) if any(row) and not row[0].startswith(IO_COMMENT)]
     if not data_rows:
-        raise InputError("Plik jest pusty.")
+        raise InputError(t("Plik jest pusty."))
     (_, header), *data_rows = data_rows
     columns = _io_columns(header)
     if len(data_rows) > IMPORT_MAX_ROWS:
-        raise InputError(f"Za dużo wierszy ({len(data_rows)}). Maksymalnie {IMPORT_MAX_ROWS} w jednym pliku.")
+        raise InputError(t("Za dużo wierszy ({count}). Maksymalnie {max} w jednym pliku.", count=len(data_rows), max=IMPORT_MAX_ROWS))
 
     parsed: list[tuple[date, list[ParsedEntryInput]]] = []
     errors: list[ImportRowErrorOut] = []
@@ -1184,7 +1268,7 @@ def import_days_csv(db: Session, user_id: int, content: str) -> ImportResultOut:
             if not entries:
                 continue
             if log_date in seen:
-                raise InputError(f"Dzień {fmt_date(log_date)} występuje w pliku więcej niż raz (wiersz {seen[log_date]}).")
+                raise InputError(t("Dzień {date} występuje w pliku więcej niż raz (wiersz {row}).", date=fmt_date(log_date), row=seen[log_date]))
             seen[log_date] = number
             parsed.append((log_date, entries))
         except InputError as exc:
@@ -1215,41 +1299,42 @@ def import_days_csv(db: Session, user_id: int, content: str) -> ImportResultOut:
 
 
 def format_entry_summary(entry: DayEntry) -> str:
+    label = display_entry_label(entry)
     if entry.entry_type == "weight":
-        return f"{entry.entry_label} – {fmt_number(entry.weight_kg)} kg"
+        return f"{label} – {fmt_number(entry.weight_kg)} kg"
     if entry.entry_type == "waist":
-        return f"{entry.entry_label} – {fmt_number(entry.waist_cm)} cm"
-    return (
-        f"{entry.entry_label} – {round(entry.kcal or 0)} kcal | "
-        f"W {round(entry.carbs_g or 0)} g · T {round(entry.fat_g or 0)} g · B {round(entry.protein_g or 0)} g"
-    )
+        return f"{label} – {fmt_number(entry.waist_cm)} cm"
+    macros = t("W {carbs} g · T {fat} g · B {protein} g", carbs=round(entry.carbs_g or 0), fat=round(entry.fat_g or 0), protein=round(entry.protein_g or 0))
+    return f"{label} – {round(entry.kcal or 0)} kcal | {macros}"
 
 
 def format_day_overview(db: Session, user_id: int, log_date: date) -> str:
     day_log = get_day_log(db, user_id, log_date)
     entries = list_day_entries(db, day_log)
     totals = day_totals_out(db, user_id, log_date, day_log=day_log, entries_count=len(entries))
-    summary = (
-        f"Suma: {round(totals.total_kcal)} kcal / cel {round(totals.target_kcal)} kcal | "
-        f"W {round(totals.total_carbs_g)} g · T {round(totals.total_fat_g)} g · B {round(totals.total_protein_g)} g."
+    macros = t(
+        "W {carbs} g · T {fat} g · B {protein} g",
+        carbs=round(totals.total_carbs_g),
+        fat=round(totals.total_fat_g),
+        protein=round(totals.total_protein_g),
     )
+    summary = t("Suma: {total} kcal / cel {target} kcal | {macros}.", total=round(totals.total_kcal), target=round(totals.target_kcal), macros=macros)
     if not entries:
-        return f"Brak wpisów w dniu {fmt_date(log_date)}. {summary}"
-    lines = [f"Pozycje dnia {fmt_date(log_date)}:"]
+        return t("Brak wpisów w dniu {date}. {summary}", date=fmt_date(log_date), summary=summary)
+    lines = [t("Pozycje dnia {date}:", date=fmt_date(log_date))]
     lines += [f"{index}. {format_entry_summary(entry)}" for index, entry in enumerate(entries, start=1)]
     if totals.balance_mode:
-        lines.append("Aktywny jest Bilans dnia – zastępuje sumę posiłków.")
+        lines.append(t("Aktywny jest Bilans dnia – zastępuje sumę posiłków."))
     lines.append(summary)
     return "\n".join(lines)
 
 
 def help_text() -> str:
-    return (
-        "Używaj gotowych szablonów. Typy wpisów: Waga, Obwód pasa, Śniadanie, Obiad, Kolacja, Przekąska, Bilans dnia. "
-        "Opcjonalnie dodaj pierwszą linię 'Data: RRRR-MM-DD'.\n\n"
-        "Komendy: 'pokaż dziś', 'cofnij ostatni', 'usuń 2'.\n\n"
-        "Przykład:\n"
-        "Data: 2026-08-03\n" + _meal_template_help("breakfast")
+    return t(
+        "Używaj gotowych szablonów. Typy wpisów: {types}. Opcjonalnie dodaj pierwszą linię 'Data: RRRR-MM-DD'.\n\n"
+        "Komendy: 'pokaż dziś', 'cofnij ostatni', 'usuń 2'.\n\nPrzykład:\nData: 2026-08-03\n{example}",
+        types=_entry_type_names(),
+        example=_meal_template_help("breakfast"),
     )
 
 
@@ -1274,16 +1359,17 @@ def handle_chat_message(db: Session, user_id: int, message: str) -> ChatResult:
     if normalized in COMMAND_UNDO:
         deleted = undo_last_entry(db, user_id, today)
         if not deleted:
-            return ChatResult("info", "Brak dzisiejszych wpisów do cofnięcia.", today)
-        return ChatResult("saved", f"Cofnąłem wpis: {format_entry_summary(deleted)}.", today)
+            return ChatResult("info", t("Brak dzisiejszych wpisów do cofnięcia."), today)
+        return ChatResult("saved", t("Cofnąłem wpis: {entry}.", entry=format_entry_summary(deleted)), today)
 
     delete_match = DELETE_POSITION_PATTERN.fullmatch(normalized)
     if delete_match:
         position = int(delete_match.group(1))
         deleted = delete_entry_by_position(db, user_id, today, position)
         if not deleted:
-            return ChatResult("error", f"Nie znalazłem dzisiejszej pozycji nr {position}. Wpisz 'pokaż dziś', aby zobaczyć numerację.", today)
-        return ChatResult("saved", f"Usunąłem pozycję nr {position}: {format_entry_summary(deleted)}.\n" + format_day_overview(db, user_id, today), today)
+            return ChatResult("error", t("Nie znalazłem dzisiejszej pozycji nr {position}. Wpisz 'pokaż dziś', aby zobaczyć numerację.", position=position), today)
+        text = t("Usunąłem pozycję nr {position}: {entry}.", position=position, entry=format_entry_summary(deleted))
+        return ChatResult("saved", text + "\n" + format_day_overview(db, user_id, today), today)
 
     try:
         parsed = parse_template_message(raw)
@@ -1292,18 +1378,21 @@ def handle_chat_message(db: Session, user_id: int, message: str) -> ChatResult:
         return ChatResult("error", str(exc), parsed_date_or(today, raw))
 
     day_label = fmt_date(day_log.log_date)
-    verb = "Zaktualizowałem" if replaced else "Zapisałem"
     if entry.entry_type == "weight":
-        text = (
-            f"{verb} wagę dla dnia {day_label}: {fmt_number(entry.weight_kg)} kg. "
-            "Cel kcal nie zmienia się automatycznie – ocenę planu znajdziesz w zakładce Użytkownik."
+        template = (
+            "Zaktualizowałem wagę dla dnia {date}: {value} kg. Cel kcal nie zmienia się automatycznie – ocenę planu znajdziesz w zakładce Cele."
+            if replaced
+            else "Zapisałem wagę dla dnia {date}: {value} kg. Cel kcal nie zmienia się automatycznie – ocenę planu znajdziesz w zakładce Cele."
         )
+        text = t(template, date=day_label, value=fmt_number(entry.weight_kg))
     elif entry.entry_type == "waist":
-        text = f"{verb} obwód pasa dla dnia {day_label}: {fmt_number(entry.waist_cm)} cm."
+        template = "Zaktualizowałem obwód pasa dla dnia {date}: {value} cm." if replaced else "Zapisałem obwód pasa dla dnia {date}: {value} cm."
+        text = t(template, date=day_label, value=fmt_number(entry.waist_cm))
     else:
-        text = f"{verb} wpis ({day_label}): {format_entry_summary(entry)}"
+        template = "Zaktualizowałem wpis ({date}): {entry}" if replaced else "Zapisałem wpis ({date}): {entry}"
+        text = t(template, date=day_label, entry=format_entry_summary(entry))
     if day_log.balance_mode and entry.entry_type in MEAL_ENTRY_TYPES:
-        text += "\nW tym dniu jest Bilans dnia – zastępuje sumę posiłków."
+        text += "\n" + t("W tym dniu jest Bilans dnia – zastępuje sumę posiłków.")
     return ChatResult("saved", text, day_log.log_date)
 
 

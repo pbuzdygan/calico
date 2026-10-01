@@ -1,9 +1,10 @@
 import { api, fetchJSON, userHeaders } from "./api.js";
 import { API_BASE, ENTRY_HINTS, FIELD_LABELS, MACRO_FIELDS, MEASUREMENT_FIELD, TEXT_TEMPLATES, TYPE_LABELS } from "./config.js";
+import { t } from "./i18n.js";
 import { refreshAfterChange } from "./nav.js";
 import { el, state } from "./state.js";
 import { closeSheet, openSheet, toast, toastError, withBusy } from "./ui.js";
-import { addDaysISO, defaultMealType, formatDayLabel, parseNumberInput, todayISO } from "./util.js";
+import { addDaysISO, defaultMealType, formatDayLabel, inputNumber, parseNumberInput, todayISO } from "./util.js";
 import { entryValueText } from "./views/log.js";
 
 // --- panel wpisu (dodawanie / edycja) ------------------------------------------------------------------
@@ -19,9 +20,10 @@ function setSheetType(type) {
   state.entryType = type;
   el.entryTypes.querySelectorAll(".type-chip").forEach((chip) => chip.setAttribute("aria-checked", String(chip.dataset.type === type)));
   showFieldGroup(type);
-  el.entryHint.textContent = ENTRY_HINTS[type] || "";
+  el.entryHint.textContent = ENTRY_HINTS[type] ? t(ENTRY_HINTS[type]) : "";
   if (state.entrySheet.mode === "add") {
-    el.entrySheetTitle.textContent = type === "weight" ? "Dodaj wagę" : type === "waist" ? "Dodaj pomiar pasa" : type === "daily_balance" ? "Dodaj bilans dnia" : "Dodaj posiłek";
+    el.entrySheetTitle.textContent =
+      type === "weight" ? t("Dodaj wagę") : type === "waist" ? t("Dodaj pomiar pasa") : type === "daily_balance" ? t("Dodaj bilans dnia") : t("Dodaj posiłek");
   }
 }
 
@@ -30,8 +32,8 @@ function setEntryMode(mode) {
   el.entryForm.hidden = mode !== "form";
   el.textForm.hidden = mode !== "text";
   if (mode === "text") {
-    el.entrySheetTitle.textContent = "Szybki wpis tekstowy";
-    if (!el.messageInput.value.trim()) el.messageInput.value = TEXT_TEMPLATES[state.entryType];
+    el.entrySheetTitle.textContent = t("Szybki wpis tekstowy");
+    if (!el.messageInput.value.trim()) el.messageInput.value = t(TEXT_TEMPLATES[state.entryType]);
     el.textStatus.textContent = "";
   } else {
     setSheetType(state.entryType);
@@ -49,12 +51,12 @@ export function openEntrySheet({ mode, type, date, entry }) {
   el.entryDateField.hidden = editing;
   el.entryDate.max = addDaysISO(todayISO(), 1);
   el.entryDate.value = date || todayISO();
-  el.entrySaveBtn.textContent = editing ? "Zapisz zmiany" : "Zapisz";
+  el.entrySaveBtn.textContent = editing ? t("Zapisz zmiany") : t("Zapisz");
   if (editing) {
-    el.entrySheetTitle.textContent = `Edytuj: ${entry.entry_label}`;
+    el.entrySheetTitle.textContent = t("Edytuj: {label}", { label: entry.entry_label });
     [...MACRO_FIELDS, "weight_kg", "waist_cm"].forEach((field) => {
       const input = el.entryForm.querySelector(`[name="${field}"]`);
-      if (input && entry[field] !== null && entry[field] !== undefined) input.value = String(entry[field]).replace(".", ",");
+      if (input && entry[field] !== null && entry[field] !== undefined) input.value = inputNumber(entry[field]);
     });
   }
   setSheetType(editing ? entry.entry_type : type || state.entryType);
@@ -73,11 +75,11 @@ function readEntryValues(type) {
     const value = parseNumberInput(input.value);
     if (value === null) {
       input.focus();
-      throw new Error(`Uzupełnij pole: ${FIELD_LABELS[field]}.`);
+      throw new Error(t("Uzupełnij pole: {field}.", { field: t(FIELD_LABELS[field]) }));
     }
     if (Number.isNaN(value) || value < 0) {
       input.focus();
-      throw new Error(`${FIELD_LABELS[field]}: podaj liczbę nieujemną, np. 82,4.`);
+      throw new Error(t("{field}: podaj liczbę nieujemną, np. 82,4.", { field: t(FIELD_LABELS[field]) }));
     }
     payload[field] = value;
   }
@@ -105,11 +107,11 @@ el.entryForm.addEventListener("submit", async (event) => {
       const { mode, entry } = state.entrySheet;
       if (mode === "edit") {
         await api(`/days/${entry.log_date}/entries/${entry.id}`, { method: "PATCH", body: { entry: values } });
-        toast("Zapisano zmiany.", "success", 3000);
+        toast(t("Zapisano zmiany."), "success", 3000);
       } else {
         const date = el.entryDate.value || todayISO();
         await api(`/days/${date}/entries`, { method: "POST", body: values });
-        toast(`Zapisano: ${TYPE_LABELS[state.entryType]} (${formatDayLabel(date)}).`, "success", 3500);
+        toast(t("Zapisano: {label} ({date}).", { label: t(TYPE_LABELS[state.entryType]), date: formatDayLabel(date) }), "success", 3500);
       }
       closeSheet(el.entrySheet);
       await refreshAfterChange();
@@ -153,7 +155,7 @@ el.messageInput.addEventListener("keydown", (event) => {
 });
 
 el.insertTemplateBtn.addEventListener("click", () => {
-  el.messageInput.value = TEXT_TEMPLATES[state.entryType];
+  el.messageInput.value = t(TEXT_TEMPLATES[state.entryType]);
   el.messageInput.focus();
 });
 
@@ -181,10 +183,10 @@ el.actionSheet.addEventListener("click", async (event) => {
   } else if (action === "move" || action === "duplicate") {
     openDateSheet(entry, action);
   } else if (action === "delete") {
-    if (!confirm(`Usunąć pozycję „${entry.entry_label}” z dnia ${formatDayLabel(entry.log_date)}?`)) return;
+    if (!confirm(t("Usunąć pozycję „{label}” z dnia {date}?", { label: entry.entry_label, date: formatDayLabel(entry.log_date) }))) return;
     try {
       await api(`/days/${entry.log_date}/entries/${entry.id}`, { method: "DELETE" });
-      toast(`Usunięto: ${entry.entry_label}.`, "success", 3500);
+      toast(t("Usunięto: {label}.", { label: entry.entry_label }), "success", 3500);
       await refreshAfterChange();
     } catch (error) {
       toastError(error);
@@ -195,8 +197,8 @@ el.actionSheet.addEventListener("click", async (event) => {
 function openDateSheet(entry, mode) {
   state.dateContext = { entry, mode };
   const isMove = mode === "move";
-  el.dateSheetTitle.textContent = isMove ? "Przenieś wpis" : "Duplikuj wpis";
-  el.dateSheetCopy.textContent = `${entry.entry_label} – ${entryValueText(entry)}, z dnia ${formatDayLabel(entry.log_date)}.`;
+  el.dateSheetTitle.textContent = isMove ? t("Przenieś wpis") : t("Duplikuj wpis");
+  el.dateSheetCopy.textContent = t("{label} – {value}, z dnia {date}.", { label: entry.entry_label, value: entryValueText(entry), date: formatDayLabel(entry.log_date) });
   el.dateSheetInput.max = addDaysISO(todayISO(), 1);
   el.dateSheetInput.value = isMove ? addDaysISO(entry.log_date, -1) : entry.log_date;
   el.dateSheetError.textContent = "";
@@ -208,14 +210,15 @@ el.dateSheetForm.addEventListener("submit", async (event) => {
   const { entry, mode } = state.dateContext;
   const targetDate = el.dateSheetInput.value;
   if (!targetDate) {
-    el.dateSheetError.textContent = "Wybierz dzień.";
+    el.dateSheetError.textContent = t("Wybierz dzień.");
     return;
   }
   try {
     await withBusy(el.dateSheetSaveBtn, async () => {
       await api(`/days/${entry.log_date}/entries/${entry.id}/${mode}`, { method: "POST", body: { target_date: targetDate } });
       closeSheet(el.dateSheet);
-      toast(`${mode === "move" ? "Przeniesiono" : "Zduplikowano"} wpis do dnia ${formatDayLabel(targetDate)}.`, "success", 4000);
+      const params = { date: formatDayLabel(targetDate) };
+      toast(mode === "move" ? t("Przeniesiono wpis do dnia {date}.", params) : t("Zduplikowano wpis do dnia {date}.", params), "success", 4000);
       if (state.view === "log" && mode === "move") state.logDate = targetDate;
       await refreshAfterChange();
     });

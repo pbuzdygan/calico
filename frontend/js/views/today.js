@@ -1,8 +1,9 @@
 import { api, profileApi } from "../api.js";
 import { dayDotsHtml, dayStatus, measurementDelta, measurementSeries, renderDelta, setRing, sparklineSvg } from "../charts.js";
 import { ADHERENCE_TOLERANCE, GOAL_LABELS, MACROS } from "../config.js";
+import { t } from "../i18n.js";
 import { el, state } from "../state.js";
-import { addDaysISO, daysBetween, fmt, fmtSigned, formatDayLabel, formatLongDay, todayISO } from "../util.js";
+import { addDaysISO, daysBetween, escapeHtml, fmt, fmtSigned, formatDayLabel, formatLongDay, todayISO } from "../util.js";
 
 // --- Dziś -----------------------------------------------------------------------------------------
 
@@ -28,13 +29,15 @@ function renderHero(detail) {
   const total = Number(detail.total_kcal) || 0;
   const target = Number(detail.target_kcal) || 0;
   setRing(total, target);
-  el.calorieRing.setAttribute("aria-label", `Spożyto ${fmt(total)} z ${fmt(target)} kcal`);
+  el.calorieRing.setAttribute("aria-label", t("Spożyto {total} z {target} kcal", { total: fmt(total), target: fmt(target) }));
   el.ringConsumed.textContent = fmt(total);
   el.ringTarget.textContent = `/ ${fmt(target)} kcal`;
   const remaining = target - total;
   el.ringStatus.classList.toggle("over", remaining < 0);
   el.ringStatus.innerHTML =
-    remaining >= 0 ? `Pozostało <strong>${fmt(remaining)} kcal</strong>` : `<strong>${fmt(-remaining)} kcal</strong> ponad cel`;
+    remaining >= 0
+      ? t("Pozostało <strong>{kcal} kcal</strong>", { kcal: fmt(remaining) })
+      : t("<strong>{kcal} kcal</strong> ponad cel", { kcal: fmt(-remaining) });
 
   // Postęp względem celu makro (g) dnia; przekroczenie celu na bursztynowo.
   el.macroList.innerHTML = MACROS.map((macro) => {
@@ -44,9 +47,9 @@ function renderHero(detail) {
     const over = goal > 0 && grams > goal;
     const note = goal > 0 ? (over ? `+${fmt(grams - goal)} g` : `${pct}%`) : "";
     return `<div class="macro${over ? " over" : ""}">
-      <span class="macro-name">${macro.label}</span>
+      <span class="macro-name">${t(macro.label)}</span>
       <span class="macro-value">${fmt(grams)}<small> / ${goal > 0 ? fmt(goal) : "–"} g</small>${note ? `<small class="macro-note">${note}</small>` : ""}</span>
-      <span class="bar ${macro.cls}" role="img" aria-label="${macro.label}: ${fmt(grams)} z ${fmt(goal)} g${over ? ", ponad cel" : ""}"><span style="width:${Math.min(pct, 100)}%"></span></span>
+      <span class="bar ${macro.cls}" role="img" aria-label="${escapeHtml(t(over ? "{label}: {grams} z {goal} g, ponad cel" : "{label}: {grams} z {goal} g", { label: t(macro.label), grams: fmt(grams), goal: fmt(goal) }))}"><span style="width:${Math.min(pct, 100)}%"></span></span>
     </div>`;
   }).join("");
   el.balanceNote.hidden = !detail.balance_mode;
@@ -62,7 +65,7 @@ function renderMeasurementCards(report, goalType) {
     if (!series.length) {
       config.value.textContent = "–";
       renderDelta(config.delta, null, config);
-      config.spark.innerHTML = `<span class="spark-empty">Dodaj pierwszy pomiar</span>`;
+      config.spark.innerHTML = `<span class="spark-empty">${t("Dodaj pierwszy pomiar")}</span>`;
       return;
     }
     const last = series[series.length - 1];
@@ -78,20 +81,20 @@ function renderAdherenceCard(report) {
   const statuses = dates.map((date) => dayStatus(byDate.get(date)));
   const done = statuses.filter((status) => status === "done").length;
   const logged = statuses.filter((status) => status !== "none").length;
-  el.adherenceValue.innerHTML = `${done} / 7<small>dni w celu</small>`;
+  el.adherenceValue.innerHTML = `${done} / 7<small>${t("dni w celu")}</small>`;
   el.adherenceDots.innerHTML = dayDotsHtml(dates, byDate);
-  el.adherenceSub.textContent = `Wpisy jedzenia: ${logged} z 7 dni · „w celu” = ±${ADHERENCE_TOLERANCE * 100}% celu kcal`;
+  el.adherenceSub.textContent = t("Wpisy jedzenia: {logged} z 7 dni · „w celu” = ±{tolerance}% celu kcal", { logged, tolerance: ADHERENCE_TOLERANCE * 100 });
 }
 
 export function paceText(rate) {
   if (rate === null || rate === undefined) return "–";
-  if (Math.abs(rate) < 0.05) return "≈ 0 kg/tydz.";
-  return `${fmtSigned(rate, 2)} kg/tydz.`;
+  if (Math.abs(rate) < 0.05) return t("≈ 0 kg/tydz.");
+  return t("{rate} kg/tydz.", { rate: fmtSigned(rate, 2) });
 }
 
 function renderTargetCard(plan) {
-  el.targetValue.innerHTML = `${fmt(plan.daily_kcal_target)}<small>kcal/dzień</small>`;
-  el.targetGoal.textContent = GOAL_LABELS[plan.goal_type] || "–";
+  el.targetValue.innerHTML = `${fmt(plan.daily_kcal_target)}<small>${t("kcal/dzień")}</small>`;
+  el.targetGoal.textContent = GOAL_LABELS[plan.goal_type] ? t(GOAL_LABELS[plan.goal_type]) : "–";
   el.targetPace.textContent = paceText(plan.expected_rate_kg_per_week);
 }
 
@@ -99,9 +102,10 @@ function renderRecommendation(plan) {
   const suggestion = plan.suggested_target_kcal;
   el.recommendationCard.hidden = suggestion === null || suggestion === undefined;
   if (!el.recommendationCard.hidden) {
-    el.recommendationText.textContent = `Trend masy z ostatnich tygodni sugeruje zmianę celu na ${fmt(suggestion)} kcal (${fmtSigned(
-      suggestion - plan.daily_kcal_target
-    )} kcal). Decyzja należy do Ciebie.`;
+    el.recommendationText.textContent = t("Trend masy z ostatnich tygodni sugeruje zmianę celu na {kcal} kcal ({delta} kcal). Decyzja należy do Ciebie.", {
+      kcal: fmt(suggestion),
+      delta: fmtSigned(suggestion - plan.daily_kcal_target),
+    });
   }
 }
 

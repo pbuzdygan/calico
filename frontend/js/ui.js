@@ -1,3 +1,4 @@
+import { t } from "./i18n.js";
 import { el } from "./state.js";
 
 // --- powiadomienia i blokada przycisków --------------------------------------------------------
@@ -10,7 +11,7 @@ export function toast(text, variant = "info", timeoutMs = 5000) {
   const close = document.createElement("button");
   close.type = "button";
   close.className = "toast-close";
-  close.setAttribute("aria-label", "Zamknij");
+  close.setAttribute("aria-label", t("Zamknij"));
   close.textContent = "×";
   close.addEventListener("click", () => item.remove());
   item.appendChild(close);

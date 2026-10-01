@@ -37,4 +37,6 @@ jobs:
         with:
           node-version: "24"
       - name: node --check (moduly ES)
-        run: for f in frontend/js/*.js frontend/js/views/*.js frontend/sw.js; do node --check "$f"; done
+        run: for f in frontend/js/*.js frontend/js/views/*.js frontend/js/locales/*.js frontend/sw.js; do node --check "$f"; done
+      - name: tlumaczenia PL/EN (scripts/check_i18n.mjs)
+        run: node scripts/check_i18n.mjs

@@ -1,5 +1,6 @@
 import { profileApi } from "./api.js";
 import { enterApp, lockUser } from "./auth.js";
+import { N_, t } from "./i18n.js";
 import { el, state } from "./state.js";
 import { toast, withBusy } from "./ui.js";
 import { fmt, fmtSigned } from "./util.js";
@@ -8,9 +9,9 @@ import { readProfilePayload } from "./views/settings.js";
 // --- korekta celu: znak zależny od celu i podgląd wyliczeń ------------------------------------------------
 
 const GOAL_DELTA_UI = {
-  cut: { label: "Deficyt kalorii", sign: "−", suggested: 15, hint: "Redukcja: cel = zapotrzebowanie (TDEE) MINUS podany procent. Zwykle 10–20%." },
-  bulk: { label: "Nadwyżka kalorii", sign: "+", suggested: 10, hint: "Masa: cel = zapotrzebowanie (TDEE) PLUS podany procent. Zwykle 5–15%." },
-  maintain: { label: "Korekta celu", sign: "", suggested: 0, hint: "Utrzymanie: cel = zapotrzebowanie (TDEE), bez korekty." },
+  cut: { label: N_("Deficyt kalorii"), sign: "−", suggested: 15, hint: N_("Redukcja: cel = zapotrzebowanie (TDEE) MINUS podany procent. Zwykle 10–20%.") },
+  bulk: { label: N_("Nadwyżka kalorii"), sign: "+", suggested: 10, hint: N_("Masa: cel = zapotrzebowanie (TDEE) PLUS podany procent. Zwykle 5–15%.") },
+  maintain: { label: N_("Korekta celu"), sign: "", suggested: 0, hint: N_("Utrzymanie: cel = zapotrzebowanie (TDEE), bez korekty.") },
 };
 
 const goalDeltaState = new Map();
@@ -26,11 +27,11 @@ export function updateGoalDeltaUi(form, { goalChanged = false } = {}) {
   const input = form.goal_delta_pct_percent;
   const goal = form.goal_type.value;
   const ui = GOAL_DELTA_UI[goal];
-  box.querySelector("[data-delta-label]").textContent = ui ? ui.label : "Korekta celu";
+  box.querySelector("[data-delta-label]").textContent = t(ui ? ui.label : "Korekta celu");
   const sign = box.querySelector("[data-delta-sign]");
   sign.textContent = ui ? ui.sign : "";
   sign.className = `delta-sign ${goal}`;
-  box.querySelector("[data-delta-hint]").textContent = ui ? ui.hint : "Najpierw wybierz cel.";
+  box.querySelector("[data-delta-hint]").textContent = t(ui ? ui.hint : "Najpierw wybierz cel.");
   if (!ui) {
     input.disabled = true;
     input.value = "";
@@ -48,13 +49,10 @@ export function updateGoalDeltaUi(form, { goalChanged = false } = {}) {
 function formatGoalPreview(payload, preview) {
   const tdee = `${fmt(preview.tdee_kcal)} kcal`;
   const pct = fmt(payload.goal_delta_pct * 100);
-  if (payload.goal_type === "cut") {
-    return `Zapotrzebowanie (TDEE): ${tdee}. Cel: ${tdee} − ${pct}% = ${fmt(preview.target_kcal)} kcal/dzień (${fmtSigned(preview.delta_kcal)} kcal).`;
-  }
-  if (payload.goal_type === "bulk") {
-    return `Zapotrzebowanie (TDEE): ${tdee}. Cel: ${tdee} + ${pct}% = ${fmt(preview.target_kcal)} kcal/dzień (${fmtSigned(preview.delta_kcal)} kcal).`;
-  }
-  return `Zapotrzebowanie (TDEE) = cel: ${fmt(preview.target_kcal)} kcal/dzień.`;
+  const params = { tdee, pct, target: fmt(preview.target_kcal), delta: fmtSigned(preview.delta_kcal) };
+  if (payload.goal_type === "cut") return t("Zapotrzebowanie (TDEE): {tdee}. Cel: {tdee} − {pct}% = {target} kcal/dzień ({delta} kcal).", params);
+  if (payload.goal_type === "bulk") return t("Zapotrzebowanie (TDEE): {tdee}. Cel: {tdee} + {pct}% = {target} kcal/dzień ({delta} kcal).", params);
+  return t("Zapotrzebowanie (TDEE) = cel: {target} kcal/dzień.", params);
 }
 
 function scheduleGoalPreview(form) {
@@ -86,7 +84,7 @@ export function openOnboarding() {
   if (el.onboardingDialog.open) return;
   el.onboardingForm.reset();
   el.onboardingError.textContent = "";
-  el.onboardingTitle.textContent = state.userName ? `Uzupełnij profil: ${state.userName}` : "Uzupełnij profil";
+  el.onboardingTitle.textContent = state.userName ? t("Uzupełnij profil: {name}", { name: state.userName }) : t("Uzupełnij profil");
   updateGoalDeltaUi(el.onboardingForm);
   el.onboardingDialog.showModal();
   el.onboardingForm.querySelector("select, input")?.focus();
@@ -108,7 +106,7 @@ el.onboardingForm.addEventListener("submit", async (event) => {
       await profileApi("", { method: "PUT", body: result.payload });
       el.onboardingDialog.close();
       await enterApp();
-      toast("Profil zapisany. Plan kaloryczny został wyliczony – możesz zaczynać.", "success");
+      toast(t("Profil zapisany. Plan kaloryczny został wyliczony – możesz zaczynać."), "success");
     });
   } catch (error) {
     el.onboardingError.textContent = error.message;

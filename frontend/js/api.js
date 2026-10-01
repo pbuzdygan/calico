@@ -1,5 +1,6 @@
 import { lockUser } from "./auth.js";
 import { API_BASE, FIELD_LABELS } from "./config.js";
+import { lang, t } from "./i18n.js";
 import { openOnboarding } from "./profile-form.js";
 import { state } from "./state.js";
 
@@ -10,7 +11,7 @@ function formatApiError(payload, fallback) {
     return payload.detail
       .map((entry) => {
         const field = Array.isArray(entry.loc) ? entry.loc[entry.loc.length - 1] : "";
-        return FIELD_LABELS[field] ? `${FIELD_LABELS[field]}: ${entry.msg}` : entry.msg;
+        return FIELD_LABELS[field] ? `${t(FIELD_LABELS[field])}: ${entry.msg}` : entry.msg;
       })
       .join(" ");
   }
@@ -21,9 +22,10 @@ function formatApiError(payload, fallback) {
 export async function fetchJSON(url, options = {}) {
   let response;
   try {
-    response = await fetch(url, options);
+    // Accept-Language: komunikaty API w języku interfejsu.
+    response = await fetch(url, { ...options, headers: { "Accept-Language": lang(), ...options.headers } });
   } catch {
-    throw new Error("Brak połączenia z serwerem. Sprawdź, czy Calico działa.");
+    throw new Error(t("Brak połączenia z serwerem. Sprawdź, czy Calico działa."));
   }
   const raw = await response.text();
   let payload = null;
@@ -35,16 +37,16 @@ export async function fetchJSON(url, options = {}) {
   if (!response.ok) {
     if (response.status === 428 && state.token) openOnboarding();
     if (response.status === 401 && state.token) {
-      lockUser("PIN został zmieniony albo sesja wygasła. Odblokuj ponownie.");
+      lockUser(t("PIN został zmieniony albo sesja wygasła. Odblokuj ponownie."));
     }
-    const fallback = response.status >= 500 ? `Błąd serwera (${response.status}).` : `Błąd żądania (${response.status}).`;
+    const fallback = response.status >= 500 ? t("Błąd serwera ({status}).", { status: response.status }) : t("Błąd żądania ({status}).", { status: response.status });
     throw new Error(formatApiError(payload, fallback));
   }
   return payload;
 }
 
 export function userHeaders(extra = {}) {
-  return { Authorization: `Bearer ${state.token}`, ...extra };
+  return { Authorization: `Bearer ${state.token}`, "Accept-Language": lang(), ...extra };
 }
 
 // --- sesja w sessionStorage: przetrwa przeładowanie karty (np. gdy telefon uśpi przeglądarkę w tle),
@@ -83,7 +85,7 @@ export function clearSession() {
 }
 
 export function api(path, { method = "GET", body, params } = {}) {
-  if (!state.userId || !state.token) return Promise.reject(new Error("Najpierw odblokuj użytkownika PIN-em."));
+  if (!state.userId || !state.token) return Promise.reject(new Error(t("Najpierw odblokuj użytkownika PIN-em.")));
   const query = new URLSearchParams({ user_id: String(state.userId), ...params });
   return fetchJSON(`${API_BASE}${path}?${query}`, {
     method,

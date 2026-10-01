@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import clock, services
+from .i18n import get_language, t
 from .models import DayEntry, DayLog, Profile
 from .schemas import PlanStatusOut
 
@@ -100,7 +101,7 @@ def _round10(value: float) -> float:
 def evaluate_plan(db: Session, user_id: int) -> PlanStatusOut:
     profile: Profile | None = services.get_profile(db, user_id)
     if profile is None:
-        raise services.NotFoundError("Nie znaleziono profilu.")
+        raise services.NotFoundError(t("Nie znaleziono profilu."))
     status = _evaluate(db, user_id, profile)
     _add_forecast(status, profile, _recent_rate_kg_per_week(db, user_id))
     return status
@@ -132,29 +133,34 @@ def _add_forecast(status: PlanStatusOut, profile: Profile, recent_rate: float | 
     remaining = target - current
     status.target_weight_remaining_kg = round(remaining, 1)
     if abs(remaining) < TARGET_REACHED_KG:
-        status.forecast_message = f"Waga docelowa {services.fmt_number(target)} kg osiągnięta."
+        status.forecast_message = t("Waga docelowa {target} kg osiągnięta.", target=services.fmt_number(target))
         return
     if recent_rate is not None:
         rate, basis = recent_rate, "trend"
-        source = f"przy obecnym trendzie ({_fmt_rate(rate)})"
+        source = t("przy obecnym trendzie ({rate})", rate=_fmt_rate(rate))
     else:
         rate, basis = status.expected_rate_kg_per_week, "plan"
-        source = f"według tempa planu ({_fmt_rate(rate)}; za mało pomiarów do trendu)" if rate is not None else ""
+        source = t("według tempa planu ({rate}; za mało pomiarów do trendu)", rate=_fmt_rate(rate)) if rate is not None else ""
     status.forecast_basis = basis if rate is not None else None
     if rate is None or abs(rate) < FORECAST_MIN_RATE_KG_PER_WEEK or rate * remaining <= 0:
         if basis == "trend":
-            status.forecast_message = f"Obecny trend ({_fmt_rate(rate)}) nie prowadzi do wagi docelowej {services.fmt_number(target)} kg."
+            status.forecast_message = t(
+                "Obecny trend ({rate}) nie prowadzi do wagi docelowej {target} kg.", rate=_fmt_rate(rate), target=services.fmt_number(target)
+            )
         else:
-            status.forecast_message = f"Plan nie zakłada zmiany masy w kierunku wagi docelowej {services.fmt_number(target)} kg."
+            status.forecast_message = t("Plan nie zakłada zmiany masy w kierunku wagi docelowej {target} kg.", target=services.fmt_number(target))
         return
     days = round(remaining / rate * 7)
     if days > FORECAST_MAX_DAYS:
-        status.forecast_message = f"Waga docelowa {services.fmt_number(target)} kg za ponad 3 lata – {source}."
+        status.forecast_message = t("Waga docelowa {target} kg za ponad 3 lata – {source}.", target=services.fmt_number(target), source=source)
         return
     status.forecast_date = clock.today() + timedelta(days=days)
-    status.forecast_message = (
-        f"Waga docelowa {services.fmt_number(target)} kg około {services.fmt_date(status.forecast_date)} "
-        f"(za ok. {max(1, round(days / 7))} tyg.) – {source}."
+    status.forecast_message = t(
+        "Waga docelowa {target} kg około {date} (za ok. {weeks} tyg.) – {source}.",
+        target=services.fmt_number(target),
+        date=services.fmt_date(status.forecast_date),
+        weeks=max(1, round(days / 7)),
+        source=source,
     )
 
 
@@ -182,7 +188,7 @@ def _evaluate(db: Session, user_id: int, profile: Profile) -> PlanStatusOut:
     # Aktualna masa: ostatni pomiar i srednia z 7 dni (niezaleznie od startu planu).
     latest = services.latest_weight_entry(db, user_id)
     if latest is None:
-        status.message = "Brak pomiarów wagi. Dodawaj wpis „Waga” regularnie (np. 2–3 razy w tygodniu, rano, na czczo)."
+        status.message = t("Brak pomiarów wagi. Dodawaj wpis „Waga” regularnie (np. 2–3 razy w tygodniu, rano, na czczo).")
         return status
     latest_date = latest.day_log.log_date
     recent = _measurements(db, user_id, latest_date - timedelta(days=TREND_AVERAGE_DAYS - 1), latest_date)
@@ -212,9 +218,13 @@ def _evaluate(db: Session, user_id: int, profile: Profile) -> PlanStatusOut:
     span = (points[-1].log_date - points[0].log_date).days if points else 0
     if len(points) < TREND_MIN_MEASUREMENTS or span < TREND_MIN_SPAN_DAYS:
         status.status = "no_data" if plan_days >= TREND_MIN_SPAN_DAYS else "wait"
-        status.message = (
-            f"Za mało danych do oceny trendu: potrzeba co najmniej {TREND_MIN_MEASUREMENTS} pomiarów z {TREND_MIN_SPAN_DAYS} dni "
-            f"od startu planu (jest {len(points)} z {span} dni). Cel pozostaje bez zmian."
+        status.message = t(
+            "Za mało danych do oceny trendu: potrzeba co najmniej {needed} pomiarów z {span_needed} dni od startu planu "
+            "(jest {count} z {span} dni). Cel pozostaje bez zmian.",
+            needed=TREND_MIN_MEASUREMENTS,
+            span_needed=TREND_MIN_SPAN_DAYS,
+            count=len(points),
+            span=span,
         )
         _add_tdee_note(status, notes)
         status.notes = notes
@@ -231,15 +241,24 @@ def _evaluate(db: Session, user_id: int, profile: Profile) -> PlanStatusOut:
         status.observed_tdee_kcal = round(intake_avg - slope_week / 7 * KCAL_PER_KG, 0)
     else:
         notes.append(
-            f"Wpisy jedzenia pokrywają {status.intake_coverage_pct:.0f}% dni okresu – za mało (min. {INTAKE_MIN_COVERAGE:.0%}), "
-            "by oszacować rzeczywiste zapotrzebowanie z obserwacji."
+            t(
+                "Wpisy jedzenia pokrywają {coverage}% dni okresu – za mało (min. {minimum}), by oszacować rzeczywiste zapotrzebowanie z obserwacji.",
+                coverage=f"{status.intake_coverage_pct:.0f}",
+                minimum=f"{INTAKE_MIN_COVERAGE:.0%}",
+            )
         )
 
     _add_tdee_note(status, notes)
 
     if low <= slope_week <= high:
         status.status = "on_track"
-        status.message = f"Plan działa: tempo {_fmt_rate(slope_week)} mieści się w zakresie {_fmt_rate(low)} … {_fmt_rate(high)} Cel pozostaje: {target:.0f} kcal."
+        status.message = t(
+            "Plan działa: tempo {rate} mieści się w zakresie {low} … {high} Cel pozostaje: {target} kcal.",
+            rate=_fmt_rate(slope_week),
+            low=_fmt_rate(low),
+            high=_fmt_rate(high),
+            target=f"{target:.0f}",
+        )
         status.notes = notes
         return status
 
@@ -249,19 +268,29 @@ def _evaluate(db: Session, user_id: int, profile: Profile) -> PlanStatusOut:
 
     if plan_days < MIN_PLAN_DAYS_BEFORE_ADJUST:
         status.status = "wait"
-        status.message += f" Plan trwa dopiero {plan_days} dni – poczekaj do {MIN_PLAN_DAYS_BEFORE_ADJUST} dni przed korektą."
+        status.message += " " + t(
+            "Plan trwa dopiero {days} dni – poczekaj do {minimum} dni przed korektą.", days=plan_days, minimum=MIN_PLAN_DAYS_BEFORE_ADJUST
+        )
         status.notes = notes
         return status
 
     suggested = _suggest_target(profile, target, direction, status.observed_tdee_kcal, expected, low, high)
     floor = MIN_TARGET_KCAL.get(profile.sex, 1500)
     if suggested is None:
-        status.message += f" Obecny cel ({target:.0f} kcal) jest już na dolnej granicy ({floor} kcal) – dalsze obniżanie wymaga konsultacji ze specjalistą."
+        status.message += " " + t(
+            "Obecny cel ({target} kcal) jest już na dolnej granicy ({floor} kcal) – dalsze obniżanie wymaga konsultacji ze specjalistą.",
+            target=f"{target:.0f}",
+            floor=floor,
+        )
     else:
         status.recommendation = direction
         status.suggested_target_kcal = suggested
-        verb = "zwiększenie" if direction == "increase" else "zmniejszenie"
-        status.message += f" Sugerowane {verb} celu do {suggested:.0f} kcal ({suggested - target:+.0f} kcal)."
+        template = (
+            "Sugerowane zwiększenie celu do {suggested} kcal ({delta} kcal)."
+            if direction == "increase"
+            else "Sugerowane zmniejszenie celu do {suggested} kcal ({delta} kcal)."
+        )
+        status.message += " " + t(template, suggested=f"{suggested:.0f}", delta=f"{suggested - target:+.0f}")
     status.notes = notes
     return status
 
@@ -291,34 +320,46 @@ def _add_tdee_note(status: PlanStatusOut, notes: list[str]) -> None:
         return
     diff = status.estimated_tdee_kcal - status.plan_tdee_kcal
     if abs(diff) >= 20:
-        change = "spadło" if diff < 0 else "wzrosło"
-        notes.append(
-            f"Szacowane zapotrzebowanie (wzór, średnia masa {services.fmt_number(status.trend_weight_kg)} kg) {change} "
-            f"do {status.estimated_tdee_kcal:.0f} kcal (start planu: {status.plan_tdee_kcal:.0f} kcal). "
+        template = (
+            "Szacowane zapotrzebowanie (wzór, średnia masa {weight} kg) spadło do {tdee} kcal (start planu: {plan_tdee} kcal). "
             "To samo w sobie nie zmienia celu – decyduje faktyczny trend masy."
+            if diff < 0
+            else "Szacowane zapotrzebowanie (wzór, średnia masa {weight} kg) wzrosło do {tdee} kcal (start planu: {plan_tdee} kcal). "
+            "To samo w sobie nie zmienia celu – decyduje faktyczny trend masy."
+        )
+        notes.append(
+            t(
+                template,
+                weight=services.fmt_number(status.trend_weight_kg),
+                tdee=f"{status.estimated_tdee_kcal:.0f}",
+                plan_tdee=f"{status.plan_tdee_kcal:.0f}",
+            )
         )
 
 
 def _fmt_rate(kg_per_week: float) -> str:
-    return f"{kg_per_week:+.2f} kg/tydz.".replace(".", ",", 1)
+    value = f"{kg_per_week:+.2f}"
+    return t("{value} kg/tydz.", value=value.replace(".", ",") if get_language() == "pl" else value)
 
 
 def _off_track_message(goal_type: str, rate: float, low: float, high: float) -> str:
-    band = f"(oczekiwane {_fmt_rate(low)} … {_fmt_rate(high)})"
+    band = t("(oczekiwane {low} … {high})", low=_fmt_rate(low), high=_fmt_rate(high))
     if goal_type == "cut":
-        return f"Masa spada za szybko: {_fmt_rate(rate)} {band}." if rate < low else f"Redukcja zwolniła: {_fmt_rate(rate)} {band}."
-    if goal_type == "bulk":
-        return f"Przyrost masy jest za wolny: {_fmt_rate(rate)} {band}." if rate < low else f"Masa rośnie za szybko: {_fmt_rate(rate)} {band}."
-    return f"Masa spada: {_fmt_rate(rate)} {band}." if rate < low else f"Masa rośnie: {_fmt_rate(rate)} {band}."
+        template = "Masa spada za szybko: {rate} {band}." if rate < low else "Redukcja zwolniła: {rate} {band}."
+    elif goal_type == "bulk":
+        template = "Przyrost masy jest za wolny: {rate} {band}." if rate < low else "Masa rośnie za szybko: {rate} {band}."
+    else:
+        template = "Masa spada: {rate} {band}." if rate < low else "Masa rośnie: {rate} {band}."
+    return t(template, rate=_fmt_rate(rate), band=band)
 
 
 def apply_suggestion(db: Session, user_id: int, expected_target_kcal: float) -> PlanStatusOut:
     """Akceptacja sugestii: nowy cel, nowy start planu, waga planu = aktualna srednia masa."""
     status = evaluate_plan(db, user_id)
     if status.suggested_target_kcal is None:
-        raise services.ConflictError("Brak aktualnej sugestii zmiany celu.")
+        raise services.ConflictError(t("Brak aktualnej sugestii zmiany celu."))
     if abs(status.suggested_target_kcal - expected_target_kcal) >= 1:
-        raise services.ConflictError("Sugestia zmieniła się w międzyczasie. Odśwież ocenę planu.")
+        raise services.ConflictError(t("Sugestia zmieniła się w międzyczasie. Odśwież ocenę planu."))
     profile = services.get_profile(db, user_id)
     profile.weight_kg = round(status.trend_weight_kg, 1)
     plan_tdee = status.observed_tdee_kcal or status.estimated_tdee_kcal or services.calculate_tdee(profile)

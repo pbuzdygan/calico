@@ -25,6 +25,8 @@ class User(Base):
     # T3.1: blokada po blednych PIN-ach (services.PIN_*).
     failed_pin_attempts: Mapped[int] = mapped_column(Integer, default=0)
     pin_locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Jezyk interfejsu wybrany przez uzytkownika ("pl"/"en"); NULL = jezyk urzadzenia.
+    language: Mapped[str | None] = mapped_column(String(8), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
 
     profile: Mapped["Profile"] = relationship(

@@ -29,6 +29,7 @@ Kluczowe decyzje produktowe (nie zmieniaj bez zgody właściciela):
 - **D8: profil bez wartości domyślnych, uzupełnienie wymuszone przy pierwszym logowaniu.** Nowe endpointy danych muszą używać zależności `profiled_user` (428 bez profilu), a nie `current_user`,
 - uwierzytelnienie: `authenticate()` w `main.py` (token `Authorization: Bearer` albo `X-User-PIN`); frontend wysyła wyłącznie token (`userHeaders()`), sesja w `sessionStorage` (`calico.session`) – nigdy nie zapisuj PIN-u w przeglądarce,
 - polskie znaki w UI i szablonach (D4); parser akceptuje też zapis bez nich,
+- **D12: aplikacja dwujęzyczna PL/EN.** Polski jest językiem źródłowym, angielski to słownik. Każdy nowy tekst od razu w obu językach (zasady w „Zasady pracy”),
 - wpisy maks. na jutro, nie wcześniej niż 2000-01-01 (D5),
 - tylko LAN (D6),
 - **D9: brak trybu administratora i logów diagnostycznych** – usunięte w całości; nie przywracaj bez zgody właściciela.
@@ -74,7 +75,10 @@ Wszystko naraz, tak jak CI (`.github/workflows/ci.yml`: ruff + pytest + `node --
 - „Dziś” zawsze przez `clock.today()`, nigdy `date.today()` / `datetime.utcnow()`.
 - Zmiana schematu bazy = nowa pozycja w `MIGRATIONS` w `db.py` (idempotentna, działająca na istniejącej bazie). **Migracje piszemy czystym SQL-em** – model ORM zna kolumny z przyszłych migracji i zapytanie przez ORM wysypie się na starej bazie. Test `tests/test_migrations.py` migruje bazę z wersji `884cafa`; po dodaniu migracji zaktualizuj oczekiwane `schema_version`.
 - Zmiana kontraktu API wymaga w tym samym PR aktualizacji frontendu (`frontend/js/`), testów i sekcji API w `README.md`.
-- Teksty UI i komunikaty API po polsku, z polskimi znakami. Komentarze w kodzie bez wymagań co do znaków.
+- Teksty UI i komunikaty API po polsku, z polskimi znakami, **zawsze z tłumaczeniem EN** (D12). Komentarze w kodzie bez wymagań co do znaków.
+- i18n frontendu: tekst w JS tylko przez `t("Polski tekst {param}", { param })` (stały napis, bez template literal), stałe z etykietami przez `N_("…")` i `t(STAŁA[x])` przy użyciu, odmiana przez `plural(n, "1", "2-4", "5+")`. Statyczny tekst w `index.html` piszemy po prostu po polsku – tłumaczy go `applyTranslations()`; elementy, których nie tłumaczymy (np. nazwy języków), mają `data-i18n-skip`. Tłumaczenie dopisz do `frontend/js/locales/en.js` (klucz = polski tekst; odmiana: `"dzień|dni|dni": ["day", "days"]`).
+- i18n backendu: komunikat dla użytkownika tylko przez `t("Polski tekst {param}", param=...)` z `app/i18n.py`, tłumaczenie w `app/locales/en.py`. Formatowanie liczb i dat przez `fmt_number`/`fmt_date` (zależne od języka). Dane zapisywane w bazie (etykiety, `source_text`) zostają po polsku – `canonical_source_text()`, `display_entry_label()` przy odczycie.
+- Kontrola: `node scripts/check_i18n.mjs` i `tests/test_i18n.py` (CI, `scripts/check.sh`) – brak tłumaczenia, martwy wpis albo polski tekst z pominięciem `t()` to błąd. Nie obchodź ich – dopisz tłumaczenie.
 - Frontend: każdy tekst z danych wstawiany do HTML przez `escapeHtml()` albo `textContent`. Komunikaty dla użytkownika przez `toast()`; akcje z przyciskami przez `withBusy()`.
 - Nie commituj `.env`, baz `*.db` ani plików z `/data`.
 - Po zakończeniu zadania zaktualizuj jego status w `docs/review-2026-09-30.md`.

@@ -1,5 +1,6 @@
 import { clearSession, fetchJSON, profileApi, saveSession } from "./api.js";
 import { API_BASE } from "./config.js";
+import { setLanguage, t } from "./i18n.js";
 import { applyViewVisibility, loadView, viewFromHash } from "./nav.js";
 import { openOnboarding } from "./profile-form.js";
 import { $, el, state } from "./state.js";
@@ -56,7 +57,7 @@ async function unlock() {
   if (!state.userId) return;
   const pin = el.pinInput.value.trim();
   if (!/^\d{4,8}$/.test(pin)) {
-    el.authStatus.textContent = "PIN musi mieć 4–8 cyfr.";
+    el.authStatus.textContent = t("PIN musi mieć 4–8 cyfr.");
     el.authStatus.className = "form-status error";
     return;
   }
@@ -85,6 +86,7 @@ function verifyPin(userId, pin) {
 export async function startSession(session) {
   state.token = session.token;
   state.tokenExpiresAt = session.expires_at || session.expiresAt || "";
+  if (session.language) setLanguage(session.language); // język zapamiętany na koncie (z /auth/verify)
   saveSession();
   const profile = await profileApi();
   if (!profile.is_complete) {
@@ -142,15 +144,15 @@ el.userDialogForm.addEventListener("submit", async (event) => {
   const displayName = el.newUserName.value.trim();
   const pin = el.newUserPin.value.trim();
   if (displayName.length < 2) {
-    el.userDialogError.textContent = "Nazwa musi mieć co najmniej 2 znaki.";
+    el.userDialogError.textContent = t("Nazwa musi mieć co najmniej 2 znaki.");
     return;
   }
   if (!/^\d{4,8}$/.test(pin)) {
-    el.userDialogError.textContent = "PIN musi mieć 4–8 cyfr.";
+    el.userDialogError.textContent = t("PIN musi mieć 4–8 cyfr.");
     return;
   }
   if (pin !== el.newUserPin2.value.trim()) {
-    el.userDialogError.textContent = "PIN-y nie są takie same.";
+    el.userDialogError.textContent = t("PIN-y nie są takie same.");
     return;
   }
   try {

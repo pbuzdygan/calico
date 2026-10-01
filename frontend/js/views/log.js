@@ -1,6 +1,7 @@
 import { api } from "../api.js";
 import { MEAL_GROUP_LABELS, MEAL_TYPES, MEASUREMENT_FIELD } from "../config.js";
 import { openActionSheet, openEntrySheet } from "../entry-sheet.js";
+import { locale, t } from "../i18n.js";
 import { refreshAfterChange } from "../nav.js";
 import { el, state } from "../state.js";
 import { toast, toastError, withBusy } from "../ui.js";
@@ -15,10 +16,15 @@ export async function loadLog(date = state.logDate) {
   const today = todayISO();
   el.logDate.value = date;
   el.logDate.max = addDaysISO(today, 1);
-  el.logDateLabel.textContent = `${formatLongDay(date)}${date === today ? " · dziś" : ""}`;
+  el.logDateLabel.textContent = `${formatLongDay(date)}${date === today ? ` · ${t("dziś")}` : ""}`;
   el.logNextBtn.disabled = date >= addDaysISO(today, 1);
   el.logTodayBtn.hidden = date === today;
-  el.logSummary.textContent = `${fmt(detail.total_kcal)} / ${fmt(detail.target_kcal)} kcal · ${detail.entries.length} ${plural(detail.entries.length, "pozycja", "pozycje", "pozycji")}`;
+  el.logSummary.textContent = `${fmt(detail.total_kcal)} / ${fmt(detail.target_kcal)} kcal · ${detail.entries.length} ${plural(
+    detail.entries.length,
+    "pozycja",
+    "pozycje",
+    "pozycji"
+  )}`;
   renderLogGroups(detail);
 }
 
@@ -30,12 +36,12 @@ export function entryValueText(entry) {
 
 function entryMacroText(entry) {
   if (MEASUREMENT_FIELD[entry.entry_type]) return "";
-  return `Białko ${fmt(entry.protein_g)} g · Węgl. ${fmt(entry.carbs_g)} g · Tł. ${fmt(entry.fat_g)} g`;
+  return t("Białko {protein} g · Węgl. {carbs} g · Tł. {fat} g", { protein: fmt(entry.protein_g), carbs: fmt(entry.carbs_g), fat: fmt(entry.fat_g) });
 }
 
 function entryRowHtml(entry) {
   const macros = entryMacroText(entry);
-  return `<button class="entry-row" type="button" data-entry-id="${entry.id}" aria-label="${escapeHtml(`${entry.entry_label}, ${entryValueText(entry)} – opcje`)}">
+  return `<button class="entry-row" type="button" data-entry-id="${entry.id}" aria-label="${escapeHtml(t("{label}, {value} – opcje", { label: entry.entry_label, value: entryValueText(entry) }))}">
     <span class="entry-name">${escapeHtml(entry.entry_label)}</span>
     <span class="entry-value">${escapeHtml(entryValueText(entry))}</span>
     ${macros ? `<span class="entry-macros">${escapeHtml(macros)}</span>` : ""}
@@ -54,22 +60,22 @@ function renderLogGroups(detail) {
     const excluded = detail.balance_mode && group.entries.length > 0;
     const body = group.entries.length
       ? `<div class="group-rows">${group.entries.map(entryRowHtml).join("")}</div>`
-      : `<div class="group-empty"><span>Brak wpisów</span><button class="btn btn-quiet" type="button" data-add-type="${group.type}">${icon("plus")}Dodaj</button></div>`;
+      : `<div class="group-empty"><span>${t("Brak wpisów")}</span><button class="btn btn-quiet" type="button" data-add-type="${group.type}">${icon("plus")}${t("Dodaj")}</button></div>`;
     return `<details class="card meal-group${excluded ? " excluded" : ""}" ${group.entries.length ? "open" : ""}>
-      <summary><span class="group-name">${group.label}</span><span class="group-kcal">${fmt(kcal)} kcal</span>${icon("chevron-down")}</summary>
+      <summary><span class="group-name">${t(group.label)}</span><span class="group-kcal">${fmt(kcal)} kcal</span>${icon("chevron-down")}</summary>
       ${body}
     </details>`;
   });
   if (balance.length) {
     html.push(`<details class="card meal-group" open>
-      <summary><span class="group-name">Bilans dnia</span><span class="group-kcal">${fmt(balance[0].kcal)} kcal</span>${icon("chevron-down")}</summary>
+      <summary><span class="group-name">${t("Bilans dnia")}</span><span class="group-kcal">${fmt(balance[0].kcal)} kcal</span>${icon("chevron-down")}</summary>
       <div class="group-rows">${balance.map(entryRowHtml).join("")}</div>
-      <div class="group-empty"><span>Zastępuje sumę posiłków z tego dnia.</span></div>
+      <div class="group-empty"><span>${t("Zastępuje sumę posiłków z tego dnia.")}</span></div>
     </details>`);
   }
   if (measurements.length) {
     html.push(`<details class="card meal-group" open>
-      <summary><span class="group-name">Pomiary</span><span class="group-kcal"></span>${icon("chevron-down")}</summary>
+      <summary><span class="group-name">${t("Pomiary")}</span><span class="group-kcal"></span>${icon("chevron-down")}</summary>
       <div class="group-rows">${measurements.map(entryRowHtml).join("")}</div>
     </details>`);
   }
@@ -98,7 +104,7 @@ function renderCalendar(daysByDate) {
   const month = state.calMonth;
   const today = todayISO();
   const maxDate = addDaysISO(today, 1);
-  const label = parseISO(month).toLocaleDateString("pl-PL", { month: "long", year: "numeric" });
+  const label = parseISO(month).toLocaleDateString(locale(), { month: "long", year: "numeric" });
   el.calMonthLabel.textContent = label.replace(/^./, (letter) => letter.toUpperCase());
   el.calNextBtn.disabled = addMonthsISO(month, 1) > maxDate;
   const leading = (parseISO(month).getDay() + 6) % 7; // poniedziałek = pierwsza kolumna
@@ -107,7 +113,7 @@ function renderCalendar(daysByDate) {
     const day = daysByDate.get(date);
     const kind = !day ? "" : day.total_kcal > 0 ? "food" : "measure";
     const classes = ["cal-cell", "cal-day", kind && `has-${kind}`, date === state.logDate && "selected", date === today && "today"].filter(Boolean).join(" ");
-    const entries = day ? `${day.entries_count} ${plural(day.entries_count, "wpis", "wpisy", "wpisów")}` : "brak wpisów";
+    const entries = day ? `${day.entries_count} ${plural(day.entries_count, "wpis", "wpisy", "wpisów")}` : t("brak wpisów");
     const aria = `${formatLongDay(date)}, ${entries}${day && day.total_kcal > 0 ? `, ${fmt(day.total_kcal)} kcal` : ""}`;
     cells.push(
       `<button class="${classes}" type="button" data-date="${date}" aria-label="${escapeHtml(aria)}" aria-pressed="${date === state.logDate}" ${date > maxDate ? "disabled" : ""}>
@@ -140,16 +146,16 @@ el.logDate.addEventListener("change", () => {
 el.logUndoBtn.addEventListener("click", () =>
   withBusy(el.logUndoBtn, async () => {
     await api(`/days/${state.logDate}/undo`, { method: "POST" });
-    toast("Cofnięto ostatnią zmianę w tym dniu.", "success", 3500);
+    toast(t("Cofnięto ostatnią zmianę w tym dniu."), "success", 3500);
     await refreshAfterChange();
   }).catch(toastError)
 );
 el.logClearBtn.addEventListener("click", async () => {
-  if (!confirm(`Usunąć wszystkie pozycje z dnia ${formatDayLabel(state.logDate)}?`)) return;
+  if (!confirm(t("Usunąć wszystkie pozycje z dnia {date}?", { date: formatDayLabel(state.logDate) }))) return;
   try {
     await withBusy(el.logClearBtn, async () => {
       await api(`/days/${state.logDate}/clear`, { method: "POST" });
-      toast(`Wyczyszczono dzień ${formatDayLabel(state.logDate)}.`, "success", 3500);
+      toast(t("Wyczyszczono dzień {date}.", { date: formatDayLabel(state.logDate) }), "success", 3500);
       await refreshAfterChange();
     });
   } catch (error) {

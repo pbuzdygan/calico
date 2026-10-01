@@ -61,7 +61,7 @@ def _migration_2_normalize_days(db: Session) -> None:
             db.delete(day_log)
             continue
         for entry in day_log.entries:
-            entry.source_text = services.build_source_text_for_entry(entry)
+            entry.source_text = services.canonical_source_text(entry.entry_type, {field: getattr(entry, field) for field in services.VALUE_FIELDS})
         services.refresh_day(db, day_log)
     db.flush()
 
@@ -134,6 +134,12 @@ def _migration_7_target_weight(db: Session) -> None:
         db.execute(text("ALTER TABLE profiles ADD COLUMN target_weight_kg FLOAT"))
 
 
+def _migration_8_user_language(db: Session) -> None:
+    """i18n: jezyk interfejsu zapamietany per uzytkownik (PL/EN)."""
+    if "language" not in _columns(db.connection(), "users"):
+        db.execute(text("ALTER TABLE users ADD COLUMN language VARCHAR(8)"))
+
+
 MIGRATIONS = [
     (1, _migration_1_drop_day_status),
     (2, _migration_2_normalize_days),
@@ -142,6 +148,7 @@ MIGRATIONS = [
     (5, _migration_5_macro_targets),
     (6, _migration_6_pin_lockout),
     (7, _migration_7_target_weight),
+    (8, _migration_8_user_language),
 ]
 
 

@@ -1,6 +1,7 @@
 import { api } from "../api.js";
 import { barChartSvg, chartWidth, dayDotsHtml, dayStatus, emptyChart, lineChartSvg, measurementSeries } from "../charts.js";
 import { ADHERENCE_TOLERANCE } from "../config.js";
+import { t } from "../i18n.js";
 import { goToLogDay } from "../nav.js";
 import { el, state } from "../state.js";
 import { closeSheet, openSheet, toastError, withBusy } from "../ui.js";
@@ -43,9 +44,13 @@ function renderProgress(report, week) {
 
   const weight = measurementSeries(report.points, "weight_kg");
   const trend = report.points.filter((point) => point.weight_trend_kg !== null).map((point) => ({ date: point.log_date, value: point.weight_trend_kg }));
-  renderProgressMeasurement(weight, { value: el.pWeightValue, delta: el.pWeightDelta, chart: el.pWeightChart, unit: "kg", color: "#1AA8FF", label: "Waga", trend, emptyAction: "wagę" });
+  renderProgressMeasurement(weight, { value: el.pWeightValue, delta: el.pWeightDelta, chart: el.pWeightChart, unit: "kg", color: "#1AA8FF", label: t("Waga"), trend, empty: t("Brak pomiarów wagi"), emptyHint: t("Dodaj wagę w zakładce Dziś, aby śledzić postęp.") });
   const waist = measurementSeries(report.points, "waist_cm");
-  renderProgressMeasurement(waist, { value: el.pWaistValue, delta: el.pWaistDelta, chart: el.pWaistChart, unit: "cm", color: "#32E6C4", label: "Obwód pasa", trend: [], emptyAction: "obwód pasa" });
+  renderProgressMeasurement(waist, { value: el.pWaistValue, delta: el.pWaistDelta, chart: el.pWaistChart, unit: "cm", color: "#32E6C4", label: t("Obwód pasa"),
+    trend: [],
+    empty: t("Brak pomiarów obwodu pasa"),
+    emptyHint: t("Dodaj obwód pasa w zakładce Dziś, aby śledzić postęp."),
+  });
 
   const byDate = new Map(report.points.map((point) => [point.log_date, point]));
   const foodDays = report.points.filter((point) => point.has_food);
@@ -53,9 +58,16 @@ function renderProgress(report, week) {
   el.pAvgKcal.textContent = report.days_with_food ? `${fmt(report.average_kcal)} kcal` : "–";
   el.pAvgTarget.textContent = report.days_with_food ? `${fmt(report.average_target_kcal)} kcal` : "–";
   el.pAdherence.textContent = report.days_with_food ? `${Math.round((inTarget / report.days_with_food) * 100)}%` : "–";
-  el.pKcalChart.innerHTML = barChartSvg(dates, byDate, chartWidth(el.pKcalChart)) || emptyChart("Brak wpisów jedzenia", "Dodaj posiłki, aby zobaczyć kalorie na tle celu.");
+  el.pKcalChart.innerHTML = barChartSvg(dates, byDate, chartWidth(el.pKcalChart)) || emptyChart(t("Brak wpisów jedzenia"), t("Dodaj posiłki, aby zobaczyć kalorie na tle celu."));
   el.pKcalNote.textContent = report.days_with_food
-    ? `${inTarget} z ${report.days_with_food} dni z jedzeniem w celu (±${ADHERENCE_TOLERANCE * 100}%). Bilans względem celu: ${fmtSigned(report.balance_vs_target_kcal)} kcal. Najwyższy dzień: ${fmt(report.highest_kcal)} kcal (${formatDayLabel(report.highest_kcal_day)}).`
+    ? t("{inTarget} z {days} dni z jedzeniem w celu (±{tolerance}%). Bilans względem celu: {balance} kcal. Najwyższy dzień: {highest} kcal ({date}).", {
+        inTarget,
+        days: report.days_with_food,
+        tolerance: ADHERENCE_TOLERANCE * 100,
+        balance: fmtSigned(report.balance_vs_target_kcal),
+        highest: fmt(report.highest_kcal),
+        date: formatDayLabel(report.highest_kcal_day),
+      })
     : "";
 
   const weekByDate = new Map(week.points.map((point) => [point.log_date, point]));
@@ -63,21 +75,26 @@ function renderProgress(report, week) {
   el.pWeekDots.innerHTML = dayDotsHtml(weekDates, weekByDate, { labels: true });
   const weekDone = weekDates.filter((date) => dayStatus(weekByDate.get(date)) === "done").length;
   const weekLogged = weekDates.filter((date) => dayStatus(weekByDate.get(date)) !== "none").length;
-  el.pWeekSub.textContent = `${weekDone} / 7 dni w celu · wpisy jedzenia w ${weekLogged} z 7 dni. Jeden słabszy dzień nie przekreśla tygodnia – liczy się regularność.`;
+  el.pWeekSub.textContent = t("{done} / 7 dni w celu · wpisy jedzenia w {logged} z 7 dni. Jeden słabszy dzień nie przekreśla tygodnia – liczy się regularność.", {
+    done: weekDone,
+    logged: weekLogged,
+  });
 
   const rows = [...report.points].reverse();
   const visible = state.historyExpanded ? rows : rows.slice(0, HISTORY_PREVIEW_ROWS);
   const moreButton =
     rows.length > visible.length
-      ? `<button class="btn btn-quiet btn-block" type="button" data-history-more>Pokaż wszystkie (${rows.length} ${plural(rows.length, "dzień", "dni", "dni")})</button>`
+      ? `<button class="btn btn-quiet btn-block" type="button" data-history-more>${t("Pokaż wszystkie ({count} {days})", { count: rows.length, days: plural(rows.length, "dzień", "dni", "dni") })}</button>`
       : "";
   el.pHistory.innerHTML = rows.length
     ? visible
         .map((point) => {
           const parts = [];
-          if (point.has_food) parts.push(`B ${fmt(point.total_protein_g)} g · W ${fmt(point.total_carbs_g)} g · T ${fmt(point.total_fat_g)} g`);
-          if (point.weight_kg !== null) parts.push(`waga ${fmt(point.weight_kg, 1)} kg`);
-          if (point.waist_cm !== null) parts.push(`pas ${fmt(point.waist_cm, 1)} cm`);
+          if (point.has_food) {
+            parts.push(t("B {protein} g · W {carbs} g · T {fat} g", { protein: fmt(point.total_protein_g), carbs: fmt(point.total_carbs_g), fat: fmt(point.total_fat_g) }));
+          }
+          if (point.weight_kg !== null) parts.push(t("waga {value} kg", { value: fmt(point.weight_kg, 1) }));
+          if (point.waist_cm !== null) parts.push(t("pas {value} cm", { value: fmt(point.waist_cm, 1) }));
           const over = point.has_food && point.total_kcal > point.target_kcal * (1 + ADHERENCE_TOLERANCE);
           return `<button class="history-row" type="button" data-date="${point.log_date}">
             <span class="history-day">${escapeHtml(formatDayLabel(point.log_date))}<small>${escapeHtml(weekdayShort(point.log_date))}</small></span>
@@ -86,7 +103,7 @@ function renderProgress(report, week) {
           </button>`;
         })
         .join("") + moreButton
-    : emptyChart("Brak wpisów w zakresie", "Zmień zakres albo dodaj pierwsze wpisy.");
+    : emptyChart(t("Brak wpisów w zakresie"), t("Zmień zakres albo dodaj pierwsze wpisy."));
 }
 
 export function rerenderProgressCharts() {
@@ -103,14 +120,14 @@ function renderProgressMeasurement(series, config) {
   if (!series.length) {
     config.value.textContent = "–";
     config.delta.textContent = "";
-    config.chart.innerHTML = emptyChart(`Brak pomiarów: ${config.label.toLowerCase()}`, `Dodaj ${config.emptyAction} w zakładce Dziś, aby śledzić postęp.`);
+    config.chart.innerHTML = emptyChart(config.empty, config.emptyHint);
     return;
   }
   const first = series[0];
   const last = series[series.length - 1];
   config.value.innerHTML = `${fmt(last.value, 1)}<small>${config.unit}</small>`;
   const diff = last.value - first.value;
-  config.delta.textContent = series.length > 1 ? `${fmtSigned(diff, 1)} ${config.unit} w zakresie` : "jeden pomiar";
+  config.delta.textContent = series.length > 1 ? t("{diff} {unit} w zakresie", { diff: fmtSigned(diff, 1), unit: config.unit }) : t("jeden pomiar");
   config.delta.className = "delta";
   const dates = daysBetween(state.progressQuery.kind === "all" ? first.date : progressRange(state.progressQuery).from, progressRange(state.progressQuery).to);
   config.chart.innerHTML = lineChartSvg({ dates, series, trend: config.trend, color: config.color, unit: config.unit, label: config.label, width: chartWidth(config.chart) });

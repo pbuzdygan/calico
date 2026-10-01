@@ -1,11 +1,14 @@
 #!/bin/sh
-# Lokalnie to samo co CI (.github/workflows/ci.yml): node --check frontendu, ruff i pytest backendu.
+# Lokalnie to samo co CI (.github/workflows/ci.yml): node --check i tlumaczenia frontendu, ruff i pytest backendu.
 # Backend w kontenerze python:3.12-slim (lokalny Python zwykle nie ma zaleznosci). Uruchom z katalogu glownego repo.
 set -e
 cd "$(dirname "$0")/.."
 
 echo "== frontend: node --check"
-for f in frontend/js/*.js frontend/js/views/*.js frontend/sw.js; do node --check "$f"; done
+for f in frontend/js/*.js frontend/js/views/*.js frontend/js/locales/*.js frontend/sw.js; do node --check "$f"; done
+
+echo "== frontend: tłumaczenia (i18n)"
+node scripts/check_i18n.mjs
 
 echo "== backend: ruff + pytest"
 docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -e PYTHONPATH=/app -v "$PWD/backend:/app" -w /app python:3.12-slim \

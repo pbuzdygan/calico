@@ -1,5 +1,5 @@
 // Calico – service worker: powłoka aplikacji offline. Dane (/api) nigdy nie trafiają do cache.
-const CACHE = "calico-shell-v7";
+const CACHE = "calico-shell-v8";
 const SHELL = [
   "/",
   "/index.html",
@@ -9,6 +9,9 @@ const SHELL = [
   "/js/charts.js",
   "/js/config.js",
   "/js/entry-sheet.js",
+  "/js/i18n.js",
+  "/js/language.js",
+  "/js/locales/en.js",
   "/js/main.js",
   "/js/nav.js",
   "/js/profile-form.js",

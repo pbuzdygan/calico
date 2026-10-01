@@ -17,13 +17,23 @@ CALICO to prosty dziennik kalorii, makroskładników, wagi i obwodu pasa. Wpisy 
 
 Mobile-first, ciemny motyw zgodny z brandingiem (`docs/UI design.md`): granatowe karty, akcenty cyan/teal, pierścień postępu jako główny motyw.
 
-- **Dziś** – przycisk „Dodaj posiłek” w prawym górnym rogu, pierścień kalorii (spożycie / cel), makroskładniki (udział w energii), karty wagi i obwodu pasa z mini-wykresami, regularność 7 dni („w celu” = ±10% celu kcal), cel kaloryczny i rekomendacja z oceny planu.
+- **Dziś** – przycisk „Dodaj posiłek” w prawym górnym rogu, pierścień kalorii (spożycie / cel), makroskładniki (postęp względem celu w g), karty wagi i obwodu pasa z mini-wykresami, regularność 7 dni („w celu” = ±10% celu kcal), cel kaloryczny i rekomendacja z oceny planu.
 - **Dziennik** – kalendarz miesięczny (kropka = dzień z wpisami: turkusowa – jedzenie, niebieska – tylko pomiary; klik wybiera dzień) oraz posiłki pogrupowane (Śniadanie, Obiad, Kolacja, Przekąski, Bilans dnia, Pomiary); dotknięcie pozycji otwiera akcje: edytuj, duplikuj, przenieś, usuń.
 - **Postępy** – 1M/3M/6M/1R/Wszystko/Własny: wykres wagi (z trendem 7 dni), obwodu, kalorii na tle celu, regularność tygodnia, historia dni.
-- **Cele** – aktualny plan, waga planu vs średnia, ocena planu i akceptacja sugestii.
-- **Ustawienia** – profil i plan, zmiana PIN-u, eksport/import CSV, usunięcie konta.
+- **Cele** – aktualny plan (z możliwością zmiany daty startu), cele makro, waga planu vs średnia, waga docelowa z prognozą, ocena planu i akceptacja sugestii.
+- **Ustawienia** – profil i plan, zmiana PIN-u, eksport/import CSV, język (polski / English), usunięcie konta.
 
 Nawigacja (Dziś, Postępy, Cele, Dziennik, Ustawienia, Wyloguj): dolny pasek na telefonie, boczny panel od 960 px (z nazwą zalogowanego użytkownika nad „Wyloguj”). Dodawanie i edycja w dolnych panelach. Font Inter (OFL) jest dołączony lokalnie (`frontend/fonts/`) – aplikacja nie pobiera nic z internetu.
+
+### Języki (PL / EN)
+
+Interfejs, komunikaty API, szablony tekstowe i pliki CSV działają po polsku i po angielsku. Przełącznik jest na ekranie logowania i w `Ustawieniach`. Wybór jest zapamiętany na urządzeniu i na koncie: po zalogowaniu obowiązuje język konta. Pierwsze uruchomienie bez wyboru: język przeglądarki (polski albo angielski).
+
+- Polski jest językiem źródłowym: teksty piszemy po polsku w kodzie i w `index.html`, a angielskie tłumaczenia są w słownikach `frontend/js/locales/en.js` i `backend/app/locales/en.py`. Kluczem jest polski tekst.
+- Frontend: `t("Tekst {param}", { param })`, `N_("Etykieta")` dla stałych, `plural(n, "dzień", "dni", "dni")`. Statyczny tekst i atrybuty (`placeholder`, `aria-label`, `title`, `alt`) z `index.html` tłumaczą się same.
+- Backend: `t("Tekst {param}", param=...)` z `app/i18n.py`. Język żądania z nagłówka `Accept-Language` (frontend wysyła wybrany język).
+- Kompletność pilnują `scripts/check_i18n.mjs` i `backend/tests/test_i18n.py` (w CI): tekst bez tłumaczenia EN, nieużywane tłumaczenie albo polski tekst z pominięciem `t()` blokują PR.
+- W bazie etykiety wpisów i `source_text` zostają po polsku (kanoniczne). API zwraca je w języku żądania (EN: `Dinner 2` zamiast `Kolacja Druga`). Parser szablonów rozumie oba języki (`Breakfast` / `Calories: 540`, `Date:`), CSV: PL – średnik i przecinek dziesiętny, EN – przecinek i kropka. Import przyjmuje oba.
 
 ### PWA i ikony
 
@@ -124,12 +134,13 @@ Wolumen z danymi zostaje ten sam. Przy pierwszym starcie baza jest migrowana aut
 
 ## API
 
-Wszystkie endpointy danych wymagają parametru `user_id` (query albo ścieżka) oraz uwierzytelnienia: `Authorization: Bearer <token>` (token z `POST /api/auth/verify`, ważny `SESSION_TTL_HOURS`) albo nagłówka `X-User-PIN`. Błędy: `401` zły PIN, `403` zakładanie kont wyłączone, `404` brak obiektu, `409` konflikt (np. drugi wpis `Waga` w dniu), `422` niepoprawne dane, `429` PIN zablokowany po błędnych próbach, `428` profil nieuzupełniony (dotyczy dni, wpisów, raportów, planu, eksportu i czatu).
+Komunikaty i teksty w odpowiedziach są w języku z nagłówka `Accept-Language` (`pl` domyślnie, `en`). Wszystkie endpointy danych wymagają parametru `user_id` (query albo ścieżka) oraz uwierzytelnienia: `Authorization: Bearer <token>` (token z `POST /api/auth/verify`, ważny `SESSION_TTL_HOURS`) albo nagłówka `X-User-PIN`. Błędy: `401` zły PIN, `403` zakładanie kont wyłączone, `404` brak obiektu, `409` konflikt (np. drugi wpis `Waga` w dniu), `422` niepoprawne dane, `429` PIN zablokowany po błędnych próbach, `428` profil nieuzupełniony (dotyczy dni, wpisów, raportów, planu, eksportu i czatu).
 
 Użytkownicy i profil:
 
 - `GET /api/users` (pusta lista = pierwszy start), `POST /api/users` — `{"display_name": "Ala", "pin": "2468"}` (`403`, gdy `ALLOW_SIGNUP=false` i istnieje już użytkownik), `DELETE /api/users/{user_id}`
 - `POST /api/users/{user_id}/pin` — `{"new_pin": "5678"}`; unieważnia stare tokeny i zwraca nowy
+- `PUT /api/users/{user_id}/language` — `{"language": "en"}` (`pl`/`en`); `POST /api/auth/verify` zwraca zapamiętany `language`
 - Blokada PIN-u: po 5 błędnych próbach konto jest blokowane na 5 min, kolejne serie po 10, 20, 40 i maks. 60 min (`429` z nagłówkiem `Retry-After`, także przy poprawnym PIN-ie). Poprawny PIN zeruje licznik. Otwarta sesja (token) działa dalej. Stałe `PIN_*` w `services.py`.
 - `POST /api/auth/verify` — `{"user_id": 1, "pin": "1234"}` → `{"ok": true, "token": "…", "expires_at": "…"}`
 - `GET|PUT /api/profile/{user_id}` — `is_complete=false` i puste pola, dopóki profil nie zostanie zapisany; `PUT` wymaga wszystkich pól. `weight_kg` to waga planu, `current_weight_kg` to ostatni pomiar. `macro_targets`: obowiązujące cele `protein_g`, `fat_g`, `carbs_g` oraz `manual_*` (null = automatycznie)

@@ -1,3 +1,7 @@
+import { lang, locale } from "./i18n.js";
+
+export { plural } from "./i18n.js";
+
 // --- narzędzia -----------------------------------------------------------------------------------
 
 function localISO(date) {
@@ -40,32 +44,35 @@ export function daysBetween(fromISO, toISO) {
   return result;
 }
 
+// Daty liczbowe: PL 01.10.2026, EN 01/10/2026 (dzień przed miesiącem, jak en-GB).
 export function formatDayLabel(isoDate) {
   if (!isoDate) return "–";
   const [year, month, day] = isoDate.split("-");
-  return `${day}.${month}.${year}`;
+  const separator = lang() === "pl" ? "." : "/";
+  return `${day}${separator}${month}${separator}${year}`;
 }
 
 export function formatShortDay(isoDate) {
   const [, month, day] = isoDate.split("-");
-  return `${day}.${month}`;
+  return lang() === "pl" ? `${day}.${month}` : `${day}/${month}`;
 }
 
 export function formatLongDay(isoDate) {
-  return parseISO(isoDate).toLocaleDateString("pl-PL", { weekday: "long", day: "numeric", month: "long" });
+  return parseISO(isoDate).toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long" });
 }
 
 export function weekdayShort(isoDate) {
-  return parseISO(isoDate).toLocaleDateString("pl-PL", { weekday: "short" }).replace(".", "");
+  return parseISO(isoDate).toLocaleDateString(locale(), { weekday: "short" }).replace(".", "");
 }
 
 const numberFormats = new Map();
 export function fmt(value, decimals = 0) {
   if (value === null || value === undefined || !Number.isFinite(Number(value))) return "–";
-  if (!numberFormats.has(decimals)) {
-    numberFormats.set(decimals, new Intl.NumberFormat("pl-PL", { maximumFractionDigits: decimals, useGrouping: "always" }));
+  const key = `${locale()}:${decimals}`;
+  if (!numberFormats.has(key)) {
+    numberFormats.set(key, new Intl.NumberFormat(locale(), { maximumFractionDigits: decimals, useGrouping: "always" }));
   }
-  return numberFormats.get(decimals).format(Number(value));
+  return numberFormats.get(key).format(Number(value));
 }
 
 export function fmtSigned(value, decimals = 0) {
@@ -83,6 +90,12 @@ export function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+// Liczba do pola formularza: separator dziesiętny języka interfejsu (parseNumberInput przyjmuje oba).
+export function inputNumber(value) {
+  const text = String(value);
+  return lang() === "pl" ? text.replace(".", ",") : text;
+}
+
 export function parseNumberInput(raw) {
   const text = String(raw ?? "").trim().replace(",", ".");
   if (!text) return null;
@@ -96,14 +109,6 @@ export function defaultMealType() {
   if (hour < 16) return "lunch";
   if (hour < 21) return "dinner";
   return "snack";
-}
-
-export function plural(count, one, few, many) {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (count === 1) return one;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
-  return many;
 }
 
 export function icon(name, cls = "icon") {

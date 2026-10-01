@@ -1,4 +1,5 @@
 import { ADHERENCE_TOLERANCE, RING_CIRCUMFERENCE } from "./config.js";
+import { plural, t } from "./i18n.js";
 import { el } from "./state.js";
 import { addDaysISO, escapeHtml, fmt, formatDayLabel, formatShortDay, icon, parseISO, todayISO, weekdayShort } from "./util.js";
 
@@ -52,7 +53,14 @@ export function lineChartSvg({ dates, series, trend = [], color, unit, decimals 
   const first = series[0];
   const last = series[series.length - 1];
   const area = series.length > 1 ? `M${x(first.date).toFixed(1)},${baseY} L${path(series).replaceAll(" ", " L")} L${x(last.date).toFixed(1)},${baseY} Z` : "";
-  const summary = `${label}: od ${fmt(first.value, decimals)} do ${fmt(last.value, decimals)} ${unit}, ${series.length} pomiarów.`;
+  const summary = t("{label}: od {from} do {to} {unit}, {count} {measurements}.", {
+    label,
+    from: fmt(first.value, decimals),
+    to: fmt(last.value, decimals),
+    unit,
+    count: series.length,
+    measurements: plural(series.length, "pomiar", "pomiary", "pomiarów"),
+  });
   return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(summary)}">
     <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity="0.22" /><stop offset="100%" stop-color="${color}" stop-opacity="0" /></linearGradient></defs>
     ${ticks
@@ -93,7 +101,7 @@ export function barChartSvg(dates, byDate, width = 640) {
     const x = pad.left + position * slot;
     const label = position % labelEvery === 0 ? `<text class="chart-axis" x="${(x + slot / 2).toFixed(1)}" y="${height - 6}" text-anchor="middle">${escapeHtml(formatShortDay(date))}</text>` : "";
     const hit = `<rect class="chart-hit" data-date="${date}" x="${x.toFixed(1)}" y="${pad.top}" width="${slot.toFixed(1)}" height="${plotHeight}"><title>${escapeHtml(
-      point?.has_food ? `${formatDayLabel(date)}: ${fmt(point.total_kcal)} / ${fmt(point.target_kcal)} kcal` : `${formatDayLabel(date)}: brak wpisów jedzenia`
+      point?.has_food ? `${formatDayLabel(date)}: ${fmt(point.total_kcal)} / ${fmt(point.target_kcal)} kcal` : `${formatDayLabel(date)}: ${t("brak wpisów jedzenia")}`
     )}</title></rect>`;
     if (!point?.has_food) return label + hit;
     const barHeight = Math.max(2, (point.total_kcal / max) * plotHeight);
@@ -102,7 +110,7 @@ export function barChartSvg(dates, byDate, width = 640) {
     return `<rect class="chart-bar${over ? " over" : ""}" x="${(x + (slot - barWidth) / 2).toFixed(1)}" y="${(pad.top + plotHeight - barHeight).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barHeight.toFixed(1)}" rx="${Math.min(4, barWidth / 2).toFixed(1)}" />
       <line class="chart-target" x1="${x.toFixed(1)}" x2="${(x + slot).toFixed(1)}" y1="${targetY.toFixed(1)}" y2="${targetY.toFixed(1)}" />${label}${hit}`;
   });
-  return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Kalorie dziennie na tle celu (${food.length} dni z jedzeniem).">
+  return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(t("Kalorie dziennie na tle celu ({count} {days} z jedzeniem).", { count: food.length, days: plural(food.length, "dzień", "dni", "dni") }))}">
     <defs><linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#20D5FF" /><stop offset="100%" stop-color="#1AA8FF" stop-opacity="0.55" /></linearGradient></defs>
     <line class="chart-grid" x1="${pad.left}" x2="${width - pad.right}" y1="${height - pad.bottom}" y2="${height - pad.bottom}" />
     ${parts.join("")}
@@ -122,7 +130,7 @@ export function dayStatus(point) {
 
 export function dayDotsHtml(dates, byDate, { labels = false } = {}) {
   const today = todayISO();
-  const statusText = { done: "w celu", logged: "wpisy poza zakresem celu", none: "brak wpisów jedzenia" };
+  const statusText = { done: t("w celu"), logged: t("wpisy poza zakresem celu"), none: t("brak wpisów jedzenia") };
   return dates
     .map((date) => {
       const status = dayStatus(byDate.get(date));
@@ -146,7 +154,7 @@ export function measurementDelta(series) {
   const weekAgo = addDaysISO(last.date, -7);
   const reference = [...series].reverse().find((point) => point.date <= weekAgo) || series[0];
   const days = Math.round((parseISO(last.date) - parseISO(reference.date)) / 86400000);
-  return { diff: last.value - reference.value, label: days >= 6 && days <= 8 ? "w tym tygodniu" : `od ${formatShortDay(reference.date)}` };
+  return { diff: last.value - reference.value, label: days >= 6 && days <= 8 ? t("w tym tygodniu") : t("od {date}", { date: formatShortDay(reference.date) }) };
 }
 
 export function renderDelta(target, delta, { unit, goodWhen }) {

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from . import clock, plan, services
 from .config import settings
 from .db import SessionLocal, healthcheck, init_db
+from .i18n import language_from_header, set_language, t
 from .models import User
 from .schemas import (
     AuthVerifyIn,
@@ -26,6 +27,7 @@ from .schemas import (
     EntryUpdateIn,
     ImportIn,
     ImportResultOut,
+    LanguageIn,
     MacroTargetsIn,
     PinChangeIn,
     PlanApplyIn,
@@ -65,6 +67,8 @@ if settings.cors_origin:
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
+    # Jezyk komunikatow API: Accept-Language (frontend wysyla wybrany jezyk); kontekst dziedziczy endpoint.
+    set_language(language_from_header(request.headers.get("accept-language")))
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
@@ -117,7 +121,6 @@ def get_db():
         db.close()
 
 
-AUTH_FAILED_DETAIL = "Sesja wygasła albo PIN jest niepoprawny – odblokuj ponownie."
 
 
 def _check_pin(db: Session, user_id: int, pin: str) -> User | None:
@@ -130,10 +133,11 @@ def _check_pin(db: Session, user_id: int, pin: str) -> User | None:
 def _wrong_pin_detail(db: Session, user_id: int) -> str:
     user = db.get(User, user_id)
     if user is None:
-        return "Niepoprawny PIN."
+        return t("Niepoprawny PIN.")
     if user.pin_locked_until and user.pin_locked_until > clock.utcnow_naive():  # ta proba zalozyla blokade
-        return f"Niepoprawny PIN. {services.PinLockedError(int((user.pin_locked_until - clock.utcnow_naive()).total_seconds()))}"
-    return f"Niepoprawny PIN. Pozostałe próby: {services.pin_attempts_left(user)}."
+        locked = services.PinLockedError(int((user.pin_locked_until - clock.utcnow_naive()).total_seconds()))
+        return f"{t('Niepoprawny PIN.')} {locked}"
+    return t("Niepoprawny PIN. Pozostałe próby: {left}.", left=services.pin_attempts_left(user))
 
 
 def authenticate(db: Session, user_id: int, x_user_pin: str | None, authorization: str | None) -> User:
@@ -144,7 +148,7 @@ def authenticate(db: Session, user_id: int, x_user_pin: str | None, authorizatio
     elif x_user_pin:
         user = _check_pin(db, user_id, x_user_pin)
     if not user:
-        raise HTTPException(status_code=401, detail=AUTH_FAILED_DETAIL)
+        raise HTTPException(status_code=401, detail=t("Sesja wygasła albo PIN jest niepoprawny – odblokuj ponownie."))
     return user
 
 
@@ -158,13 +162,16 @@ def current_user(
     return authenticate(db, user_id, x_user_pin, authorization)
 
 
-PROFILE_REQUIRED_DETAIL = "Uzupełnij profil (płeć, wiek, wzrost, waga, aktywność, cel) – bez niego CALICO nie może wyliczyć planu."
+def _profile_required() -> HTTPException:
+    return HTTPException(
+        status_code=428, detail=t("Uzupełnij profil (płeć, wiek, wzrost, waga, aktywność, cel) – bez niego CALICO nie może wyliczyć planu.")
+    )
 
 
 def profiled_user(user: User = Depends(current_user), db: Session = Depends(get_db)) -> User:
     """Uzytkownik z uzupelnionym profilem - wymagane dla wszystkich danych dziennika, raportow i planu."""
     if not services.is_profile_complete(db, user.id):
-        raise HTTPException(status_code=428, detail=PROFILE_REQUIRED_DETAIL)
+        raise _profile_required()
     return user
 
 
@@ -204,7 +211,13 @@ def api_delete_user(user: User = Depends(current_user), db: Session = Depends(ge
 def api_change_pin(payload: PinChangeIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     services.change_user_pin(db, user, payload.new_pin)
     token, expires_at = services.issue_session(db, user)  # stare tokeny przestaja dzialac
-    return AuthVerifyOut(ok=True, token=token, expires_at=expires_at)
+    return AuthVerifyOut(ok=True, token=token, expires_at=expires_at, language=user.language)
+
+
+@app.put("/api/users/{user_id}/language", response_model=LanguageIn)
+def api_set_language(payload: LanguageIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    services.set_user_language(db, user, payload.language)
+    return payload
 
 
 @app.post("/api/auth/verify", response_model=AuthVerifyOut)
@@ -213,7 +226,7 @@ def api_verify_auth(payload: AuthVerifyIn, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail=_wrong_pin_detail(db, payload.user_id))
     token, expires_at = services.issue_session(db, user)
-    return AuthVerifyOut(ok=True, token=token, expires_at=expires_at)
+    return AuthVerifyOut(ok=True, token=token, expires_at=expires_at, language=user.language)
 
 
 def _profile_out(db: Session, user_id: int) -> ProfileOut:
@@ -342,7 +355,7 @@ def api_update_entry(
         parsed = services.parse_template_message(payload.source_text)
         parsed.log_date = None  # do zmiany dnia sluzy /move
     else:
-        raise services.InputError("Podaj 'entry' albo 'source_text'.")
+        raise services.InputError(t("Podaj 'entry' albo 'source_text'."))
     services.update_entry(db, user.id, entry, parsed)
     return services.day_detail_out(db, user.id, log_date)
 
@@ -382,7 +395,7 @@ def api_delete_entry(log_date: date, entry_id: int, user: User = Depends(profile
 @app.post("/api/days/{log_date}/undo", response_model=DayDetailOut)
 def api_undo_entry(log_date: date, user: User = Depends(profiled_user), db: Session = Depends(get_db)):
     if not services.undo_last_entry(db, user.id, log_date):
-        raise services.NotFoundError("Brak wpisów do cofnięcia w tym dniu.")
+        raise services.NotFoundError(t("Brak wpisów do cofnięcia w tym dniu."))
     return services.day_detail_out(db, user.id, log_date)
 
 
@@ -427,7 +440,7 @@ def api_export(user: User = Depends(profiled_user), db: Session = Depends(get_db
 
 @app.get("/api/import/template")
 def api_import_template(user: User = Depends(profiled_user)):
-    return _csv_download(services.import_template_csv(), "calico-szablon-importu.csv")
+    return _csv_download(services.import_template_csv(), t("calico-szablon-importu.csv"))
 
 
 @app.post("/api/import", response_model=ImportResultOut)
@@ -447,7 +460,7 @@ def api_chat_message(
 ):
     user = authenticate(db, payload.user_id, x_user_pin, authorization)
     if not services.is_profile_complete(db, user.id):
-        raise HTTPException(status_code=428, detail=PROFILE_REQUIRED_DETAIL)
+        raise _profile_required()
 
     result = services.handle_chat_message(db, user.id, payload.message)
     totals = services.day_totals_out(db, user.id, result.log_date)

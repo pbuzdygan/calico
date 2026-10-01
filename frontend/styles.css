@@ -314,6 +314,14 @@ kbd {
   cursor: pointer;
 }
 
+.lang-switch {
+  width: min(260px, 100%);
+}
+
+.lang-switch .seg {
+  min-height: 44px;
+}
+
 .seg.active {
   background: var(--bg-elevated);
   color: var(--text-primary);

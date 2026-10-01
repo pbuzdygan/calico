@@ -1,0 +1,1 @@
+"""Pakiet slownikow tlumaczen."""

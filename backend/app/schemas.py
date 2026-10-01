@@ -151,10 +151,18 @@ class AuthVerifyIn(BaseModel):
     pin: str = Field(pattern=r"^\d{4,8}$")
 
 
+Language = Literal["pl", "en"]
+
+
 class AuthVerifyOut(BaseModel):
     ok: bool
     token: str | None = None
     expires_at: datetime | None = None
+    language: Language | None = None  # zapamietany jezyk uzytkownika (None = jezyk urzadzenia)
+
+
+class LanguageIn(BaseModel):
+    language: Language
 
 
 class DayTotalsOut(BaseModel):

@@ -3,6 +3,7 @@
 //   ui.js       toasty, withBusy, panele  api.js    fetchJSON, sesja             auth.js  blokada, użytkownicy
 //   nav.js      routing (location.hash)   charts.js wykresy SVG                  views/*  widoki Dziś…Ustawienia
 //   entry-sheet.js  panel wpisu i akcje pozycji   profile-form.js  korekta celu, onboarding (D8)
+//   i18n.js     t(), N_(), plural(), tłumaczenie statycznego HTML (słownik locales/en.js)   language.js  przełącznik PL/EN
 // Moduły z obsługą zdarzeń importujemy jawnie (rejestrują listenery przy ładowaniu).
 import "./nav.js";
 import "./entry-sheet.js";
@@ -12,6 +13,8 @@ import "./views/log.js";
 import "./views/progress.js";
 import "./views/goals.js";
 import "./views/settings.js";
+import { renderLanguageButtons } from "./language.js";
+import { applyTranslations } from "./i18n.js";
 import { readSession } from "./api.js";
 import { loadUsers, showScreen, startSession } from "./auth.js";
 import { RING_CIRCUMFERENCE } from "./config.js";
@@ -20,6 +23,8 @@ import { el, state } from "./state.js";
 // --- start -------------------------------------------------------------------------------------------------------
 
 async function init() {
+  applyTranslations(); // statyczny HTML w języku urządzenia (przed jakimkolwiek renderowaniem przez JS)
+  renderLanguageButtons();
   el.ringProgress.style.strokeDasharray = `${RING_CIRCUMFERENCE}`;
   el.ringProgress.style.strokeDashoffset = `${RING_CIRCUMFERENCE}`;
   const saved = readSession();
@@ -41,7 +46,7 @@ async function init() {
       // 401 już wylogował (lockUser). Inny błąd (np. chwilowy brak sieci) nie kasuje sesji.
       if (state.token) {
         showScreen("lock");
-        el.authStatus.textContent = `${error.message} Odśwież stronę albo podaj PIN.`;
+        el.authStatus.textContent = `${error.message} ${t("Odśwież stronę albo podaj PIN.")}`;
         el.authStatus.className = "form-status error";
         return registerServiceWorker();
       }
