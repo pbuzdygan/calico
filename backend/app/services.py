@@ -11,9 +11,10 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from . import clock
-from .models import DayEntry, DayLog, Profile, User
+from .config import settings
+from .models import AppMeta, DayEntry, DayLog, Profile, User
 from .schemas import DayDetailOut, DayEntryOut, DayTotalsOut, EntryValuesIn, ProfileIn, ReportDayOut, ReportSummaryOut
-from .security import hash_pin, validate_pin, verify_pin
+from .security import create_session_token, hash_pin, new_secret, pin_fingerprint, read_session_token, validate_pin, verify_pin
 
 
 class InputError(ValueError):
@@ -431,6 +432,33 @@ def require_user_pin(db: Session, user_id: int, pin: str) -> User | None:
         return None
     user = db.get(User, user_id)
     if not user or not verify_pin(pin, user.pin_hash):
+        return None
+    return user
+
+
+def _session_secret(db: Session) -> str:
+    if settings.session_secret:
+        return settings.session_secret
+    meta = db.get(AppMeta, "session_secret")
+    if meta is None:
+        meta = AppMeta(key="session_secret", value=new_secret())
+        db.add(meta)
+        db.flush()
+    return meta.value
+
+
+def issue_session(db: Session, user: User) -> tuple[str, datetime]:
+    expires_at = clock.now_utc() + timedelta(hours=settings.session_ttl_hours)
+    token = create_session_token(user.id, user.pin_hash, _session_secret(db), int(expires_at.timestamp()))
+    return token, expires_at
+
+
+def user_from_session(db: Session, user_id: int, token: str) -> User | None:
+    data = read_session_token(token, _session_secret(db), int(clock.now_utc().timestamp()))
+    if not data or data.get("uid") != user_id:
+        return None
+    user = db.get(User, user_id)
+    if not user or data.get("pv") != pin_fingerprint(user.pin_hash):
         return None
     return user
 

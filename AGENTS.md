@@ -27,6 +27,7 @@ Kluczowe decyzje produktowe (nie zmieniaj bez zgody właściciela):
 - **D2b: aktualna waga ≠ automatyczna zmiana celu.** Cel kcal to plan zmieniany tylko jawnie (zapis profilu albo akceptacja sugestii z `app/plan.py`). Wpisy `Waga` służą do monitorowania trendu. Nie dodawaj automatycznego przeliczania celu po ważeniu („spirala deficytu”),
 - zmiana celu aktualizuje cel dziś i w przyszłych dniach, nie w przeszłych (D3),
 - **D8: profil bez wartości domyślnych, uzupełnienie wymuszone przy pierwszym logowaniu.** Nowe endpointy danych muszą używać zależności `profiled_user` (428 bez profilu), a nie `current_user`,
+- uwierzytelnienie: `authenticate()` w `main.py` (token `Authorization: Bearer` albo `X-User-PIN`); frontend wysyła wyłącznie token (`userHeaders()`), sesja w `sessionStorage` (`calico.session`) – nigdy nie zapisuj PIN-u w przeglądarce,
 - polskie znaki w UI i szablonach (D4); parser akceptuje też zapis bez nich,
 - wpisy maks. na jutro, nie wcześniej niż 2000-01-01 (D5),
 - tylko LAN (D6),

@@ -115,6 +115,8 @@ class AuthVerifyIn(BaseModel):
 
 class AuthVerifyOut(BaseModel):
     ok: bool
+    token: str | None = None
+    expires_at: datetime | None = None
 
 
 class DayTotalsOut(BaseModel):

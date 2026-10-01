@@ -62,7 +62,8 @@ const el = new Proxy({}, { get: (cache, id) => (cache[id] ??= $(id)) });
 const state = {
   userId: null,
   userName: "",
-  pin: "",
+  token: "",
+  tokenExpiresAt: "",
   view: "today",
   logDate: todayISO(),
   progressQuery: { kind: "days", days: 30 },
@@ -259,8 +260,8 @@ async function fetchJSON(url, options = {}) {
     payload = null;
   }
   if (!response.ok) {
-    if (response.status === 428 && state.pin) openOnboarding();
-    if (response.status === 401 && state.pin) {
+    if (response.status === 428 && state.token) openOnboarding();
+    if (response.status === 401 && state.token) {
       lockUser("PIN został zmieniony albo sesja wygasła. Odblokuj ponownie.");
     }
     const fallback = response.status >= 500 ? `Błąd serwera (${response.status}).` : `Błąd żądania (${response.status}).`;
@@ -270,11 +271,46 @@ async function fetchJSON(url, options = {}) {
 }
 
 function userHeaders(extra = {}) {
-  return { "X-User-PIN": state.pin, ...extra };
+  return { Authorization: `Bearer ${state.token}`, ...extra };
+}
+
+// --- sesja w sessionStorage: przetrwa przeładowanie karty (np. gdy telefon uśpi przeglądarkę w tle),
+// znika po zamknięciu karty. Przechowujemy podpisany token z serwera, nie PIN.
+
+const SESSION_KEY = "calico.session";
+
+function saveSession() {
+  try {
+    sessionStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({ userId: state.userId, userName: state.userName, token: state.token, expiresAt: state.tokenExpiresAt })
+    );
+  } catch {
+    // tryb prywatny / zablokowany storage - sesja tylko w pamięci
+  }
+}
+
+function readSession() {
+  try {
+    const session = JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null");
+    if (!session?.token || !session.userId) return null;
+    if (session.expiresAt && Date.parse(session.expiresAt) <= Date.now()) return null;
+    return session;
+  } catch {
+    return null;
+  }
+}
+
+function clearSession() {
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+  } catch {
+    // brak dostępu do storage
+  }
 }
 
 function api(path, { method = "GET", body, params } = {}) {
-  if (!state.userId || !state.pin) return Promise.reject(new Error("Najpierw odblokuj użytkownika PIN-em."));
+  if (!state.userId || !state.token) return Promise.reject(new Error("Najpierw odblokuj użytkownika PIN-em."));
   const query = new URLSearchParams({ user_id: String(state.userId), ...params });
   return fetchJSON(`${API_BASE}${path}?${query}`, {
     method,
@@ -312,12 +348,15 @@ document.querySelectorAll("dialog.sheet").forEach((dialog) => {
 // --- blokada i sesja -------------------------------------------------------------------------------
 
 function showScreen(name) {
+  // name === null: nic nie pokazuj (wznawianie sesji po przeładowaniu, bez mignięcia ekranu blokady)
   el.lockScreen.hidden = name !== "lock";
   el.app.hidden = name !== "app";
 }
 
 function lockUser(message = "") {
-  state.pin = "";
+  state.token = "";
+  state.tokenExpiresAt = "";
+  clearSession();
   state.entriesById.clear();
   document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
   showScreen("lock");
@@ -358,12 +397,9 @@ async function unlock() {
     el.authStatus.className = "form-status error";
     return;
   }
+  let session;
   try {
-    await fetchJSON(`${API_BASE}/auth/verify`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: state.userId, pin }),
-    });
+    session = await verifyPin(state.userId, pin);
   } catch (error) {
     el.authStatus.textContent = error.message;
     el.authStatus.className = "form-status error";
@@ -372,13 +408,24 @@ async function unlock() {
   }
   el.pinInput.value = "";
   el.authStatus.textContent = "";
-  await startSession(pin);
+  await startSession(session);
 }
 
-async function startSession(pin) {
-  state.pin = pin;
+function verifyPin(userId, pin) {
+  return fetchJSON(`${API_BASE}/auth/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: userId, pin }),
+  });
+}
+
+async function startSession(session) {
+  state.token = session.token;
+  state.tokenExpiresAt = session.expires_at || session.expiresAt || "";
+  saveSession();
   const profile = await profileApi();
   if (!profile.is_complete) {
+    showScreen("lock");
     openOnboarding();
     return;
   }
@@ -426,7 +473,7 @@ async function loadView(view) {
 }
 
 window.addEventListener("hashchange", () => {
-  if (!state.pin || el.app.hidden) return;
+  if (!state.token || el.app.hidden) return;
   state.view = viewFromHash();
   applyViewVisibility(state.view);
   window.scrollTo({ top: 0 });
@@ -1152,12 +1199,15 @@ el.pinChangeForm.addEventListener("submit", async (event) => {
   }
   try {
     await withBusy(event.submitter, async () => {
-      await fetchJSON(`${API_BASE}/users/${state.userId}/pin`, {
+      const changed = await fetchJSON(`${API_BASE}/users/${state.userId}/pin`, {
         method: "POST",
         headers: userHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ new_pin: newPin }),
       });
-      state.pin = newPin;
+      // Zmiana PIN-u unieważnia stare tokeny - serwer zwraca nowy.
+      state.token = changed.token;
+      state.tokenExpiresAt = changed.expires_at;
+      saveSession();
       el.newPinInput.value = "";
       toast("PIN został zmieniony.", "success");
     });
@@ -1479,7 +1529,7 @@ function scheduleGoalPreview(form) {
   meta.timer = setTimeout(async () => {
     const result = readProfilePayload(form);
     const seq = ++meta.seq;
-    if (result.error || !state.pin || !state.userId) {
+    if (result.error || !state.token || !state.userId) {
       output.textContent = "";
       return;
     }
@@ -1587,7 +1637,7 @@ el.userDialogForm.addEventListener("submit", async (event) => {
       });
       closeSheet(el.userDialog);
       await loadUsers(user.id);
-      await startSession(pin);
+      await startSession(await verifyPin(user.id, pin));
     });
   } catch (error) {
     el.userDialogError.textContent = error.message;
@@ -1599,14 +1649,37 @@ el.userDialogForm.addEventListener("submit", async (event) => {
 async function init() {
   el.ringProgress.style.strokeDasharray = `${RING_CIRCUMFERENCE}`;
   el.ringProgress.style.strokeDashoffset = `${RING_CIRCUMFERENCE}`;
-  showScreen("lock");
+  const saved = readSession();
+  showScreen(saved ? null : "lock");
   try {
-    await loadUsers();
+    await loadUsers(saved?.userId ?? null);
   } catch (error) {
+    showScreen("lock");
     el.authStatus.textContent = error.message;
     el.authStatus.className = "form-status error";
+    return;
   }
+  if (saved && state.userId === saved.userId) {
+    // Wznowienie sesji po przeładowaniu karty - bez ponownego pytania o PIN.
+    try {
+      await startSession(saved);
+      return registerServiceWorker();
+    } catch (error) {
+      // 401 już wylogował (lockUser). Inny błąd (np. chwilowy brak sieci) nie kasuje sesji.
+      if (state.token) {
+        showScreen("lock");
+        el.authStatus.textContent = `${error.message} Odśwież stronę albo podaj PIN.`;
+        el.authStatus.className = "form-status error";
+        return registerServiceWorker();
+      }
+    }
+  }
+  showScreen("lock");
   el.pinInput.focus();
+  registerServiceWorker();
+}
+
+function registerServiceWorker() {
   // Service worker działa tylko w bezpiecznym kontekście (https albo localhost).
   if ("serviceWorker" in navigator && window.isSecureContext) {
     navigator.serviceWorker.register("/sw.js").catch(() => {});

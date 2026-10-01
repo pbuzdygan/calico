@@ -100,16 +100,29 @@ def get_db():
         db.close()
 
 
+AUTH_FAILED_DETAIL = "Sesja wygasła albo PIN jest niepoprawny – odblokuj ponownie."
+
+
+def authenticate(db: Session, user_id: int, x_user_pin: str | None, authorization: str | None) -> User:
+    """Token sesji (Authorization: Bearer) albo PIN (X-User-PIN). Token nie wymaga liczenia PBKDF2."""
+    user = None
+    if authorization and authorization.lower().startswith("bearer "):
+        user = services.user_from_session(db, user_id, authorization[7:].strip())
+    elif x_user_pin:
+        user = services.require_user_pin(db, user_id, x_user_pin)
+    if not user:
+        raise HTTPException(status_code=401, detail=AUTH_FAILED_DETAIL)
+    return user
+
+
 def current_user(
     user_id: int,
     db: Session = Depends(get_db),
-    x_user_pin: str = Header(..., alias="X-User-PIN"),
+    x_user_pin: str | None = Header(None, alias="X-User-PIN"),
+    authorization: str | None = Header(None),
 ) -> User:
     """user_id pochodzi ze sciezki (/users/{user_id}) albo z query (?user_id=)."""
-    user = services.require_user_pin(db, user_id, x_user_pin)
-    if not user:
-        raise HTTPException(status_code=401, detail="Niepoprawny PIN")
-    return user
+    return authenticate(db, user_id, x_user_pin, authorization)
 
 
 PROFILE_REQUIRED_DETAIL = "Uzupełnij profil (płeć, wiek, wzrost, waga, aktywność, cel) – bez niego CALICO nie może wyliczyć planu."
@@ -157,14 +170,17 @@ def api_delete_user(user: User = Depends(current_user), db: Session = Depends(ge
 @app.post("/api/users/{user_id}/pin", response_model=AuthVerifyOut)
 def api_change_pin(payload: PinChangeIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     services.change_user_pin(db, user, payload.new_pin)
-    return AuthVerifyOut(ok=True)
+    token, expires_at = services.issue_session(db, user)  # stare tokeny przestaja dzialac
+    return AuthVerifyOut(ok=True, token=token, expires_at=expires_at)
 
 
 @app.post("/api/auth/verify", response_model=AuthVerifyOut)
 def api_verify_auth(payload: AuthVerifyIn, db: Session = Depends(get_db)):
-    if not services.require_user_pin(db, payload.user_id, payload.pin):
+    user = services.require_user_pin(db, payload.user_id, payload.pin)
+    if not user:
         raise HTTPException(status_code=401, detail="Niepoprawny PIN")
-    return AuthVerifyOut(ok=True)
+    token, expires_at = services.issue_session(db, user)
+    return AuthVerifyOut(ok=True, token=token, expires_at=expires_at)
 
 
 def _profile_out(db: Session, user_id: int) -> ProfileOut:
@@ -358,10 +374,13 @@ def api_export(user: User = Depends(profiled_user), db: Session = Depends(get_db
 
 
 @app.post("/api/chat/message", response_model=ChatResponseOut)
-def api_chat_message(payload: ChatMessageIn, db: Session = Depends(get_db), x_user_pin: str = Header(..., alias="X-User-PIN")):
-    user = services.require_user_pin(db, payload.user_id, x_user_pin)
-    if not user:
-        raise HTTPException(status_code=401, detail="Niepoprawny PIN")
+def api_chat_message(
+    payload: ChatMessageIn,
+    db: Session = Depends(get_db),
+    x_user_pin: str | None = Header(None, alias="X-User-PIN"),
+    authorization: str | None = Header(None),
+):
+    user = authenticate(db, payload.user_id, x_user_pin, authorization)
     if not services.is_profile_complete(db, user.id):
         raise HTTPException(status_code=428, detail=PROFILE_REQUIRED_DETAIL)
 

@@ -115,16 +115,18 @@ Wolumen z danymi zostaje ten sam. Przy pierwszym starcie baza jest migrowana aut
 | `SQLITE_PATH` | `/data/calico.db` | ścieżka bazy |
 | `CORS_ORIGIN` | pusty | pusty = brak CORS (frontend i API na tym samym adresie) |
 | `DEFAULT_USER_PIN` | `1234` | PIN użytkownika tworzonego przy pierwszym starcie |
+| `SESSION_TTL_HOURS` | `12` | jak długo ważna jest sesja po odblokowaniu PIN-em |
+| `SESSION_SECRET` | pusty | klucz podpisu sesji; pusty = generowany automatycznie i zapisany w bazie |
 
 ## API
 
-Wszystkie endpointy danych wymagają nagłówka `X-User-PIN` i parametru `user_id` (query albo ścieżka). Błędy: `401` zły PIN, `404` brak obiektu, `409` konflikt (np. drugi wpis `Waga` w dniu), `422` niepoprawne dane, `428` profil nieuzupełniony (dotyczy dni, wpisów, raportów, planu, eksportu i czatu).
+Wszystkie endpointy danych wymagają parametru `user_id` (query albo ścieżka) oraz uwierzytelnienia: `Authorization: Bearer <token>` (token z `POST /api/auth/verify`, ważny `SESSION_TTL_HOURS`) albo nagłówka `X-User-PIN`. Błędy: `401` zły PIN, `404` brak obiektu, `409` konflikt (np. drugi wpis `Waga` w dniu), `422` niepoprawne dane, `428` profil nieuzupełniony (dotyczy dni, wpisów, raportów, planu, eksportu i czatu).
 
 Użytkownicy i profil:
 
 - `GET /api/users`, `POST /api/users`, `DELETE /api/users/{user_id}`
-- `POST /api/users/{user_id}/pin` — `{"new_pin": "5678"}`
-- `POST /api/auth/verify`
+- `POST /api/users/{user_id}/pin` — `{"new_pin": "5678"}`; unieważnia stare tokeny i zwraca nowy
+- `POST /api/auth/verify` — `{"user_id": 1, "pin": "1234"}` → `{"ok": true, "token": "…", "expires_at": "…"}`
 - `GET|PUT /api/profile/{user_id}` — `is_complete=false` i puste pola, dopóki profil nie zostanie zapisany; `PUT` wymaga wszystkich pól. `weight_kg` to waga planu, `current_weight_kg` to ostatni pomiar
 - `POST /api/profile/{user_id}/preview` — podgląd BMR/TDEE/celu dla danych z formularza (bez zapisu, działa przed uzupełnieniem profilu)
 - `GET /api/profile/{user_id}/plan` — ocena planu (status, trend, TDEE, sugestia)
@@ -166,6 +168,7 @@ docker run --rm -v "$PWD:/app" -w /app -e PYTHONPATH=/app python:3.12-slim \
 
 - Aplikacja jest przeznaczona do sieci domowej. Nie wystawiaj jej do internetu bez reverse proxy z TLS i dodatkowego uwierzytelnienia.
 - PIN haszowany PBKDF2-SHA256 (120 tys. iteracji), porównanie w czasie stałym.
+- Po odblokowaniu przeglądarka dostaje podpisany token sesji (HMAC-SHA256, ważny 12 h) i trzyma go w `sessionStorage`: sesja przetrwa przeładowanie karty (np. gdy telefon uśpi przeglądarkę w tle), znika po zamknięciu karty i po wylogowaniu. PIN nie jest nigdzie zapisywany. Zmiana PIN-u unieważnia wszystkie wcześniejsze sesje.
 - Nagłówki `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`.
 - SQLite w trybie `WAL`, `foreign_keys=ON`; sekrety poza repo (`.env` w `.gitignore`).
 
