@@ -91,11 +91,23 @@ def test_undo_endpoint_works_on_selected_day(api):
     assert api.post("/api/days/2026-06-10/undo").status_code == 404
 
 
-def test_parse_error_is_reported_as_error(api, client):
+def test_parse_error_is_reported_as_error(api):
     reply = api.chat("blah")
     assert reply["kind"] == "error"
-    logs = client.get(f"/api/admin/diagnostics/logs?user_id={api.uid}", headers={"X-Admin-PIN": "4321"}).json()
-    assert logs[0]["outcome"] == "error"
+    assert "Nie rozpoznano" in reply["reply"]
+
+
+def test_admin_endpoints_are_gone(client):
+    assert client.get("/api/admin/status").status_code == 404
+
+
+def test_days_list_date_range_for_calendar(api):
+    api.chat(meal(date_line="2026-05-31"))
+    api.chat(meal(date_line="2026-06-01"))
+    api.chat("Data: 2026-06-10\nWaga: 80")
+    api.chat(meal())
+    days = api.get("/api/days", date_from="2026-06-01", date_to="2026-06-30", limit=62).json()
+    assert [(day["log_date"], day["entries_count"]) for day in days] == [("2026-06-15", 1), ("2026-06-10", 1), ("2026-06-01", 1)]
 
 
 def test_structured_create_and_update(api):

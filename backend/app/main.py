@@ -1,4 +1,3 @@
-import hmac
 import mimetypes
 from contextlib import asynccontextmanager
 from datetime import date
@@ -13,25 +12,14 @@ from sqlalchemy.orm import Session
 from . import clock, plan, services
 from .config import settings
 from .db import SessionLocal, healthcheck, init_db
-from .diagnostics import (
-    delete_user_diagnostics,
-    diagnostics_enabled,
-    diagnostics_entries_for_user,
-    diagnostics_user_summaries,
-    log_chat_interaction,
-)
 from .models import User
 from .schemas import (
-    AdminStatusOut,
-    AdminVerifyIn,
     AuthVerifyIn,
     AuthVerifyOut,
     ChatMessageIn,
     ChatResponseOut,
     DayDetailOut,
     DaySummaryOut,
-    DiagnosticsLogEntryOut,
-    DiagnosticsUserSummaryOut,
     EntryCreateIn,
     EntryDuplicateIn,
     EntryMoveIn,
@@ -134,13 +122,6 @@ def profiled_user(user: User = Depends(current_user), db: Session = Depends(get_
     return user
 
 
-def require_admin_pin(pin: str) -> None:
-    if not diagnostics_enabled():
-        raise HTTPException(status_code=404, detail="Tryb Admin jest wyłączony")
-    if not hmac.compare_digest(pin.encode("utf-8"), settings.admin_pin.encode("utf-8")):
-        raise HTTPException(status_code=401, detail="Niepoprawny PIN administratora")
-
-
 # --- system ---------------------------------------------------------------------
 
 
@@ -152,40 +133,6 @@ def health():
 @app.get("/api/meta")
 def api_meta():
     return {"today": clock.today(), "timezone": settings.app_timezone}
-
-
-# --- admin ----------------------------------------------------------------------
-
-
-@app.get("/api/admin/status", response_model=AdminStatusOut)
-def api_admin_status():
-    return AdminStatusOut(enabled=diagnostics_enabled())
-
-
-@app.post("/api/admin/verify", response_model=AuthVerifyOut)
-def api_admin_verify(payload: AdminVerifyIn):
-    require_admin_pin(payload.pin)
-    return AuthVerifyOut(ok=True)
-
-
-@app.get("/api/admin/diagnostics/users", response_model=list[DiagnosticsUserSummaryOut])
-def api_admin_diagnostics_users(db: Session = Depends(get_db), x_admin_pin: str = Header(..., alias="X-Admin-PIN")):
-    require_admin_pin(x_admin_pin)
-    return diagnostics_user_summaries(db)
-
-
-@app.get("/api/admin/diagnostics/logs", response_model=list[DiagnosticsLogEntryOut])
-def api_admin_diagnostics_logs(
-    user_id: int,
-    limit: int = 200,
-    db: Session = Depends(get_db),
-    x_admin_pin: str = Header(..., alias="X-Admin-PIN"),
-):
-    require_admin_pin(x_admin_pin)
-    user = db.get(User, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="Nie znaleziono użytkownika")
-    return diagnostics_entries_for_user(user, limit=min(max(limit, 1), 1000))
 
 
 # --- uzytkownicy i profil -------------------------------------------------------
@@ -204,8 +151,6 @@ def api_create_user(payload: UserCreate, db: Session = Depends(get_db)):
 @app.delete("/api/users/{user_id}", response_model=AuthVerifyOut)
 def api_delete_user(user: User = Depends(current_user), db: Session = Depends(get_db)):
     services.delete_user(db, user)
-    db.commit()
-    delete_user_diagnostics(user)
     return AuthVerifyOut(ok=True)
 
 
@@ -290,8 +235,15 @@ def api_current_day(user: User = Depends(profiled_user), db: Session = Depends(g
 
 
 @app.get("/api/days", response_model=list[DaySummaryOut])
-def api_list_days(limit: int = 30, user: User = Depends(profiled_user), db: Session = Depends(get_db)):
-    return services.list_days(db, user_id=user.id, limit=limit)
+def api_list_days(
+    limit: int = 30,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    user: User = Depends(profiled_user),
+    db: Session = Depends(get_db),
+):
+    """Dni z wpisami (od najnowszego); opcjonalnie w zakresie dat - np. miesiac dla kalendarza."""
+    return services.list_days(db, user_id=user.id, limit=limit, date_from=date_from, date_to=date_to)
 
 
 @app.get("/api/days/{log_date}", response_model=DayDetailOut)
@@ -415,14 +367,7 @@ def api_chat_message(payload: ChatMessageIn, db: Session = Depends(get_db), x_us
 
     result = services.handle_chat_message(db, user.id, payload.message)
     totals = services.day_totals_out(db, user.id, result.log_date)
-    response = ChatResponseOut(**totals.model_dump(), kind=result.kind, reply=result.text)
-    log_chat_interaction(
-        user,
-        payload.message.strip(),
-        response_payload=response.model_dump(mode="json"),
-        error_text=result.text if result.kind == "error" else None,
-    )
-    return response
+    return ChatResponseOut(**totals.model_dump(), kind=result.kind, reply=result.text)
 
 
 # --- frontend (musi byc na koncu, po trasach API) ------------------------------------

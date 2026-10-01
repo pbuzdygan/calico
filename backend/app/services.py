@@ -567,17 +567,17 @@ def day_detail_out(db: Session, user_id: int, log_date: date) -> DayDetailOut:
     )
 
 
-def list_days(db: Session, user_id: int, limit: int = 30) -> list[DayTotalsOut]:
-    """Dni, w ktorych jest co najmniej jeden wpis (od najnowszego)."""
+def list_days(
+    db: Session, user_id: int, limit: int = 30, date_from: date | None = None, date_to: date | None = None
+) -> list[DayTotalsOut]:
+    """Dni, w ktorych jest co najmniej jeden wpis (od najnowszego), opcjonalnie w zakresie dat."""
     safe_limit = min(max(limit, 1), 366)
-    rows = db.execute(
-        select(DayLog, func.count(DayEntry.id))
-        .join(DayEntry, DayEntry.day_log_id == DayLog.id)
-        .where(DayLog.user_id == user_id)
-        .group_by(DayLog.id)
-        .order_by(DayLog.log_date.desc())
-        .limit(safe_limit)
-    ).all()
+    query = select(DayLog, func.count(DayEntry.id)).join(DayEntry, DayEntry.day_log_id == DayLog.id).where(DayLog.user_id == user_id)
+    if date_from is not None:
+        query = query.where(DayLog.log_date >= date_from)
+    if date_to is not None:
+        query = query.where(DayLog.log_date <= date_to)
+    rows = db.execute(query.group_by(DayLog.id).order_by(DayLog.log_date.desc()).limit(safe_limit)).all()
     return [day_totals_out(db, user_id, day_log.log_date, day_log=day_log, entries_count=count) for day_log, count in rows]
 
 

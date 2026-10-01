@@ -46,7 +46,6 @@
       <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" /></symbol>
       <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></symbol>
       <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4" /><path d="M11 12l8.5-8.5M16 7l3 3" /></symbol>
-      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7.5 3v6c0 4.8-3.3 7.9-7.5 9-4.2-1.1-7.5-4.2-7.5-9V6z" /></symbol>
       <symbol id="i-logout" viewBox="0 0 24 24"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" /><path d="M9 16l-4-4 4-4M5 12h11" /></symbol>
       <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></symbol>
       <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h9" /></symbol>
@@ -73,7 +72,6 @@
         </form>
         <div class="lock-links">
           <button id="newUserBtn" class="btn btn-quiet" type="button"><svg class="icon"><use href="#i-user" /></svg>Nowy użytkownik</button>
-          <button id="lockAdminBtn" class="btn btn-quiet" type="button"><svg class="icon"><use href="#i-shield" /></svg>Administrator</button>
         </div>
       </div>
     </section>
@@ -86,9 +84,9 @@
           <span>Calico</span>
         </div>
         <a class="nav-item" href="#/today" data-view="today"><svg class="icon"><use href="#i-today" /></svg><span>Dziś</span></a>
-        <a class="nav-item" href="#/log" data-view="log"><svg class="icon"><use href="#i-log" /></svg><span>Dziennik</span></a>
         <a class="nav-item" href="#/progress" data-view="progress"><svg class="icon"><use href="#i-progress" /></svg><span>Postępy</span></a>
         <a class="nav-item" href="#/goals" data-view="goals"><svg class="icon"><use href="#i-goals" /></svg><span>Cele</span></a>
+        <a class="nav-item" href="#/log" data-view="log"><svg class="icon"><use href="#i-log" /></svg><span>Dziennik</span></a>
         <a class="nav-item" href="#/more" data-view="more"><svg class="icon"><use href="#i-more" /></svg><span>Więcej</span></a>
       </nav>
 
@@ -100,7 +98,7 @@
               <h1 id="todayTitle">Dziś</h1>
               <p id="todayDate" class="screen-sub"></p>
             </div>
-            <a class="icon-btn" href="#/log" aria-label="Dziennik – wybierz dzień"><svg class="icon"><use href="#i-calendar" /></svg></a>
+            <button id="addFoodBtn" class="btn btn-primary btn-header" type="button"><svg class="icon"><use href="#i-plus" /></svg><span>Dodaj posiłek</span></button>
           </header>
 
           <div class="today-grid">
@@ -132,8 +130,6 @@
                 <p id="balanceNote" class="note" hidden><svg class="icon"><use href="#i-info" /></svg>Aktywny Bilans dnia – zastępuje sumę posiłków.</p>
               </article>
 
-              <button id="addFoodBtn" class="btn btn-cta" type="button"><svg class="icon"><use href="#i-plus" /></svg>Dodaj posiłek</button>
-              <button id="quickTextBtn" class="btn btn-quiet btn-block" type="button"><svg class="icon"><use href="#i-text" /></svg>Szybki wpis tekstowy</button>
             </div>
 
             <div class="today-side">
@@ -186,6 +182,18 @@
               <p id="logSummary" class="screen-sub"></p>
             </div>
           </header>
+          <div class="log-layout">
+          <article class="card calendar-card" aria-labelledby="calMonthLabel">
+            <div class="cal-head">
+              <button id="calPrevBtn" class="icon-btn" type="button" aria-label="Poprzedni miesiąc"><svg class="icon"><use href="#i-chevron-left" /></svg></button>
+              <h2 id="calMonthLabel" class="cal-title" aria-live="polite"></h2>
+              <button id="calNextBtn" class="icon-btn" type="button" aria-label="Następny miesiąc"><svg class="icon"><use href="#i-chevron-right" /></svg></button>
+            </div>
+            <div class="cal-weekdays" aria-hidden="true"><span>Pn</span><span>Wt</span><span>Śr</span><span>Cz</span><span>Pt</span><span>Sb</span><span>Nd</span></div>
+            <div id="calGrid" class="cal-grid"></div>
+            <p class="cal-legend"><span class="cal-dot food"></span>jedzenie<span class="cal-dot measure"></span>tylko pomiary</p>
+          </article>
+          <div class="log-content">
           <div class="date-nav">
             <button id="logPrevBtn" class="icon-btn" type="button" aria-label="Poprzedni dzień"><svg class="icon"><use href="#i-chevron-left" /></svg></button>
             <label class="date-pill">
@@ -201,7 +209,8 @@
             <button id="logUndoBtn" class="btn btn-quiet" type="button"><svg class="icon"><use href="#i-undo" /></svg>Cofnij ostatni</button>
             <button id="logClearBtn" class="btn btn-quiet btn-danger-text" type="button"><svg class="icon"><use href="#i-trash" /></svg>Wyczyść dzień</button>
           </div>
-          <button id="logFab" class="fab" type="button" aria-label="Dodaj wpis w tym dniu"><svg class="icon"><use href="#i-plus" /></svg></button>
+          </div>
+          </div>
         </section>
 
         <!-- POSTĘPY -->
@@ -221,17 +230,7 @@
             <button class="seg" type="button" data-range="custom">Własny</button>
           </div>
           <div class="progress-grid">
-            <article class="card chart-card">
-              <div class="card-head"><h2 class="card-title"><svg class="icon icon-blue"><use href="#i-scale" /></svg>Waga</h2></div>
-              <div class="metric-line"><strong id="pWeightValue" class="metric-value">–</strong><span id="pWeightDelta" class="delta"></span></div>
-              <div id="pWeightChart" class="chart-area"></div>
-            </article>
-            <article class="card chart-card">
-              <div class="card-head"><h2 class="card-title"><svg class="icon icon-teal"><use href="#i-ruler" /></svg>Obwód pasa</h2></div>
-              <div class="metric-line"><strong id="pWaistValue" class="metric-value">–</strong><span id="pWaistDelta" class="delta"></span></div>
-              <div id="pWaistChart" class="chart-area"></div>
-            </article>
-            <article class="card chart-card">
+            <article class="card chart-card span-full">
               <div class="card-head"><h2 class="card-title"><svg class="icon icon-accent"><use href="#i-flame" /></svg>Kalorie i cel</h2></div>
               <div class="stat-row">
                 <div class="stat"><span>Średnie spożycie</span><strong id="pAvgKcal">–</strong></div>
@@ -242,11 +241,21 @@
               <p id="pKcalNote" class="card-sub"></p>
             </article>
             <article class="card chart-card">
+              <div class="card-head"><h2 class="card-title"><svg class="icon icon-blue"><use href="#i-scale" /></svg>Waga</h2></div>
+              <div class="metric-line"><strong id="pWeightValue" class="metric-value">–</strong><span id="pWeightDelta" class="delta"></span></div>
+              <div id="pWeightChart" class="chart-area"></div>
+            </article>
+            <article class="card chart-card">
+              <div class="card-head"><h2 class="card-title"><svg class="icon icon-teal"><use href="#i-ruler" /></svg>Obwód pasa</h2></div>
+              <div class="metric-line"><strong id="pWaistValue" class="metric-value">–</strong><span id="pWaistDelta" class="delta"></span></div>
+              <div id="pWaistChart" class="chart-area"></div>
+            </article>
+            <article class="card chart-card span-full">
               <div class="card-head"><h2 class="card-title"><svg class="icon icon-teal"><use href="#i-check" /></svg>Regularność – ostatnie 7 dni</h2></div>
               <div id="pWeekDots" class="day-dots day-dots-labeled"></div>
               <p id="pWeekSub" class="card-sub"></p>
             </article>
-            <article class="card chart-card progress-history">
+            <article class="card chart-card progress-history span-full">
               <div class="card-head"><h2 class="card-title"><svg class="icon"><use href="#i-log" /></svg>Historia dni</h2></div>
               <div id="pHistory" class="row-list"></div>
             </article>
@@ -384,11 +393,6 @@
                 <button id="exportBtn" class="btn btn-quiet btn-block" type="button">Pobierz CSV</button>
               </article>
               <article class="card">
-                <div class="card-head"><h2 class="card-title"><svg class="icon"><use href="#i-shield" /></svg>Administrator</h2></div>
-                <p class="card-sub">Logi diagnostyczne wpisów tekstowych (wymaga PIN-u administratora).</p>
-                <button id="moreAdminBtn" class="btn btn-quiet btn-block" type="button">Otwórz panel</button>
-              </article>
-              <article class="card">
                 <div class="card-head"><h2 class="card-title"><svg class="icon"><use href="#i-user" /></svg>Konto</h2></div>
                 <div class="button-col">
                   <button id="logoutBtn" class="btn btn-quiet btn-block" type="button"><svg class="icon"><use href="#i-logout" /></svg>Zmień użytkownika</button>
@@ -401,35 +405,6 @@
         </section>
       </main>
     </div>
-
-    <!-- PANEL ADMINISTRATORA (dostępny z ekranu blokady i z „Więcej”) -->
-    <section id="adminScreen" class="admin-screen" aria-labelledby="adminTitle" hidden>
-      <header class="screen-header">
-        <button id="adminBackBtn" class="icon-btn" type="button" aria-label="Wróć"><svg class="icon"><use href="#i-chevron-left" /></svg></button>
-        <div class="grow">
-          <h1 id="adminTitle">Administrator</h1>
-          <p class="screen-sub">Logi diagnostyczne wpisów tekstowych.</p>
-        </div>
-      </header>
-      <article class="card">
-        <form id="adminUnlockForm" class="inline-form">
-          <input id="adminPinInput" type="password" maxlength="64" placeholder="PIN administratora" aria-label="PIN administratora" />
-          <button id="adminUnlockBtn" class="btn btn-primary" type="submit">Odblokuj</button>
-        </form>
-        <p id="adminStatus" class="form-status"></p>
-      </article>
-      <article class="card">
-        <div class="field">
-          <label for="adminUserSelect">Użytkownik z logami</label>
-          <select id="adminUserSelect"></select>
-        </div>
-        <div class="button-row">
-          <button id="adminRefreshBtn" class="btn btn-quiet" type="button">Odśwież</button>
-        </div>
-        <p id="adminSummary" class="card-sub"></p>
-        <div id="adminLogs" class="admin-logs"></div>
-      </article>
-    </section>
 
     <div id="toastRegion" class="toast-region" aria-live="polite"></div>
 

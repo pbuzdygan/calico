@@ -71,10 +71,7 @@ const state = {
   actionEntry: null,
   dateContext: null,
   planSuggestion: null,
-  adminPin: "",
-  adminEnabled: false,
-  adminSummaries: [],
-  adminReturn: "lock",
+  calMonth: monthStartISO(todayISO()),
   entriesById: new Map(),
   goalType: null,
   lastProgress: null,
@@ -90,6 +87,20 @@ function localISO(date) {
 
 function todayISO() {
   return localISO(new Date());
+}
+
+function monthStartISO(isoDate) {
+  return `${isoDate.slice(0, 7)}-01`;
+}
+
+function addMonthsISO(monthStart, months) {
+  const date = parseISO(monthStart);
+  date.setMonth(date.getMonth() + months, 1);
+  return localISO(date);
+}
+
+function monthEndISO(monthStart) {
+  return addDaysISO(addMonthsISO(monthStart, 1), -1);
 }
 
 function parseISO(isoDate) {
@@ -249,7 +260,7 @@ async function fetchJSON(url, options = {}) {
   }
   if (!response.ok) {
     if (response.status === 428 && state.pin) openOnboarding();
-    if (response.status === 401 && state.pin && !url.includes("/admin/")) {
+    if (response.status === 401 && state.pin) {
       lockUser("PIN został zmieniony albo sesja wygasła. Odblokuj ponownie.");
     }
     const fallback = response.status >= 500 ? `Błąd serwera (${response.status}).` : `Błąd żądania (${response.status}).`;
@@ -303,7 +314,6 @@ document.querySelectorAll("dialog.sheet").forEach((dialog) => {
 function showScreen(name) {
   el.lockScreen.hidden = name !== "lock";
   el.app.hidden = name !== "app";
-  el.adminScreen.hidden = name !== "admin";
 }
 
 function lockUser(message = "") {
@@ -696,7 +706,8 @@ function renderRecommendation(plan) {
 
 async function loadLog(date = state.logDate) {
   state.logDate = date;
-  const detail = await api(`/days/${date}`);
+  if (monthStartISO(date) !== state.calMonth) state.calMonth = monthStartISO(date);
+  const [detail] = await Promise.all([api(`/days/${date}`), loadCalendar()]);
   const today = todayISO();
   el.logDate.value = date;
   el.logDate.max = addDaysISO(today, 1);
@@ -771,13 +782,57 @@ el.logGroups.addEventListener("click", (event) => {
   if (row) openActionSheet(state.entriesById.get(Number(row.dataset.entryId)));
 });
 
+// --- kalendarz dziennika (szybki wybór dnia; kropka = dzień z wpisami) ---------------------------------
+
+async function loadCalendar() {
+  const month = state.calMonth;
+  const days = await api("/days", { params: { date_from: month, date_to: monthEndISO(month), limit: 62 } });
+  if (month === state.calMonth) renderCalendar(new Map(days.map((day) => [day.log_date, day])));
+}
+
+function renderCalendar(daysByDate) {
+  const month = state.calMonth;
+  const today = todayISO();
+  const maxDate = addDaysISO(today, 1);
+  const label = parseISO(month).toLocaleDateString("pl-PL", { month: "long", year: "numeric" });
+  el.calMonthLabel.textContent = label.replace(/^./, (letter) => letter.toUpperCase());
+  el.calNextBtn.disabled = addMonthsISO(month, 1) > maxDate;
+  const leading = (parseISO(month).getDay() + 6) % 7; // poniedziałek = pierwsza kolumna
+  const cells = Array.from({ length: leading }, () => '<span class="cal-cell cal-blank" aria-hidden="true"></span>');
+  daysBetween(month, monthEndISO(month)).forEach((date) => {
+    const day = daysByDate.get(date);
+    const kind = !day ? "" : day.total_kcal > 0 ? "food" : "measure";
+    const classes = ["cal-cell", "cal-day", kind && `has-${kind}`, date === state.logDate && "selected", date === today && "today"].filter(Boolean).join(" ");
+    const entries = day ? `${day.entries_count} ${plural(day.entries_count, "wpis", "wpisy", "wpisów")}` : "brak wpisów";
+    const aria = `${formatLongDay(date)}, ${entries}${day && day.total_kcal > 0 ? `, ${fmt(day.total_kcal)} kcal` : ""}`;
+    cells.push(
+      `<button class="${classes}" type="button" data-date="${date}" aria-label="${escapeHtml(aria)}" aria-pressed="${date === state.logDate}" ${date > maxDate ? "disabled" : ""}>
+        <span>${Number(date.slice(8))}</span>${kind ? '<span class="cal-mark" aria-hidden="true"></span>' : ""}
+      </button>`
+    );
+  });
+  el.calGrid.innerHTML = cells.join("");
+}
+
+el.calGrid.addEventListener("click", (event) => {
+  const day = event.target.closest(".cal-day");
+  if (day && !day.disabled) loadLog(day.dataset.date).catch(toastError);
+});
+el.calPrevBtn.addEventListener("click", () => {
+  state.calMonth = addMonthsISO(state.calMonth, -1);
+  loadCalendar().catch(toastError);
+});
+el.calNextBtn.addEventListener("click", () => {
+  state.calMonth = addMonthsISO(state.calMonth, 1);
+  loadCalendar().catch(toastError);
+});
+
 el.logPrevBtn.addEventListener("click", () => loadLog(addDaysISO(state.logDate, -1)).catch(toastError));
 el.logNextBtn.addEventListener("click", () => loadLog(addDaysISO(state.logDate, 1)).catch(toastError));
 el.logTodayBtn.addEventListener("click", () => loadLog(todayISO()).catch(toastError));
 el.logDate.addEventListener("change", () => {
   if (el.logDate.value) loadLog(el.logDate.value).catch(toastError);
 });
-el.logFab.addEventListener("click", () => openEntrySheet({ mode: "add", type: defaultMealType(), date: state.logDate }));
 el.logUndoBtn.addEventListener("click", () =>
   withBusy(el.logUndoBtn, async () => {
     await api(`/days/${state.logDate}/undo`, { method: "POST" });
@@ -1179,7 +1234,7 @@ function setEntryMode(mode) {
   }
 }
 
-function openEntrySheet({ mode, type, date, entry, text = false }) {
+function openEntrySheet({ mode, type, date, entry }) {
   state.entrySheet = { mode, entry: entry || null };
   el.entryError.textContent = "";
   el.entryForm.querySelectorAll("[data-fields] input").forEach((input) => {
@@ -1199,11 +1254,10 @@ function openEntrySheet({ mode, type, date, entry, text = false }) {
     });
   }
   setSheetType(editing ? entry.entry_type : type || state.entryType);
-  setEntryMode(text && !editing ? "text" : "form");
+  setEntryMode("form");
   openSheet(el.entrySheet);
   requestAnimationFrame(() => {
-    const target = text ? el.messageInput : el.entryForm.querySelector("[data-fields]:not([hidden]) input");
-    target?.focus({ preventScroll: true });
+    el.entryForm.querySelector("[data-fields]:not([hidden]) input")?.focus({ preventScroll: true });
   });
 }
 
@@ -1300,7 +1354,6 @@ el.insertTemplateBtn.addEventListener("click", () => {
 });
 
 el.addFoodBtn.addEventListener("click", () => openEntrySheet({ mode: "add", type: defaultMealType() }));
-el.quickTextBtn.addEventListener("click", () => openEntrySheet({ mode: "add", type: defaultMealType(), text: true }));
 [el.weightCard, el.waistCard].forEach((card) => card.addEventListener("click", () => openEntrySheet({ mode: "add", type: card.dataset.measure })));
 
 // --- akcje pozycji: edytuj / duplikuj / przenieś / usuń ---------------------------------------------------
@@ -1540,112 +1593,6 @@ el.userDialogForm.addEventListener("submit", async (event) => {
     el.userDialogError.textContent = error.message;
   }
 });
-
-// --- administrator ---------------------------------------------------------------------------------------------
-
-function setAdminStatus(text, variant = "") {
-  el.adminStatus.textContent = text;
-  el.adminStatus.className = `form-status ${variant}`.trim();
-}
-
-function adminHeaders() {
-  return state.adminPin ? { "X-Admin-PIN": state.adminPin } : {};
-}
-
-async function openAdmin(from) {
-  state.adminReturn = from;
-  showScreen("admin");
-  window.scrollTo({ top: 0 });
-  try {
-    const status = await fetchJSON(`${API_BASE}/admin/status`);
-    state.adminEnabled = Boolean(status.enabled);
-    if (!state.adminEnabled) {
-      setAdminStatus("Tryb administracyjny jest wyłączony. Ustaw ADMIN_PIN w pliku .env.", "error");
-      el.adminUserSelect.innerHTML = "";
-      el.adminLogs.innerHTML = "";
-      el.adminSummary.textContent = "";
-    } else if (!state.adminPin) {
-      setAdminStatus("Podaj PIN administratora.");
-      el.adminPinInput.focus();
-    } else {
-      await loadAdminSummaries();
-      await loadAdminLogs();
-    }
-  } catch (error) {
-    setAdminStatus(error.message, "error");
-  }
-}
-
-async function loadAdminSummaries() {
-  if (!state.adminEnabled || !state.adminPin) return;
-  const summaries = await fetchJSON(`${API_BASE}/admin/diagnostics/users`, { headers: adminHeaders() });
-  state.adminSummaries = summaries;
-  el.adminUserSelect.innerHTML = summaries.length
-    ? summaries.map((summary) => `<option value="${summary.user_id}">${escapeHtml(summary.display_name)} (${summary.entries_count})</option>`).join("")
-    : '<option value="">Brak logów</option>';
-}
-
-async function loadAdminLogs() {
-  if (!state.adminEnabled || !state.adminPin || !el.adminUserSelect.value) {
-    el.adminLogs.innerHTML = "";
-    return;
-  }
-  const userId = el.adminUserSelect.value;
-  const entries = await fetchJSON(`${API_BASE}/admin/diagnostics/logs?user_id=${encodeURIComponent(userId)}&limit=200`, { headers: adminHeaders() });
-  const summary = state.adminSummaries.find((item) => String(item.user_id) === String(userId));
-  el.adminSummary.textContent = summary ? `Wpisy diagnostyczne: ${summary.entries_count} · ostatni zapis: ${summary.last_event_at || "–"}` : "";
-  el.adminLogs.innerHTML = entries.length
-    ? entries
-        .map((entry) => {
-          const response = entry.response ? JSON.stringify(entry.response, null, 2) : "";
-          const error = entry.error ? `\nBłąd:\n${entry.error}` : "";
-          return `<article class="log-entry${entry.outcome === "error" ? " is-error" : ""}">
-            <div class="card-head"><strong>${escapeHtml(entry.timestamp)}</strong><span class="chip">${escapeHtml(entry.outcome)}</span></div>
-            <pre>${escapeHtml(entry.user_message)}</pre>
-            <pre>${escapeHtml(response + error)}</pre>
-          </article>`;
-        })
-        .join("")
-    : '<p class="card-sub">Brak wpisów diagnostycznych dla wybranego użytkownika.</p>';
-}
-
-el.lockAdminBtn.addEventListener("click", () => openAdmin("lock"));
-el.moreAdminBtn.addEventListener("click", () => openAdmin("app"));
-el.adminBackBtn.addEventListener("click", () => showScreen(state.adminReturn === "app" && state.pin ? "app" : "lock"));
-
-el.adminUnlockForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const candidate = el.adminPinInput.value.trim();
-  if (!candidate) {
-    setAdminStatus("Podaj PIN administratora.", "error");
-    return;
-  }
-  try {
-    await withBusy(el.adminUnlockBtn, async () => {
-      await fetchJSON(`${API_BASE}/admin/verify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin: candidate }),
-      });
-      state.adminPin = candidate;
-      el.adminPinInput.value = "";
-      setAdminStatus("Panel odblokowany.", "success");
-      await loadAdminSummaries();
-      await loadAdminLogs();
-    });
-  } catch (error) {
-    state.adminPin = "";
-    setAdminStatus(error.message, "error");
-  }
-});
-
-el.adminRefreshBtn.addEventListener("click", () =>
-  withBusy(el.adminRefreshBtn, async () => {
-    await loadAdminSummaries();
-    await loadAdminLogs();
-  }).catch((error) => setAdminStatus(error.message, "error"))
-);
-el.adminUserSelect.addEventListener("change", () => loadAdminLogs().catch((error) => setAdminStatus(error.message, "error")));
 
 // --- start -------------------------------------------------------------------------------------------------------
 

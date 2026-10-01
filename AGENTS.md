@@ -2,7 +2,7 @@
 
 ## Projekt
 
-CALICO — dziennik kalorii, makroskładników, wagi i obwodu pasa. Wpisy przez formularz albo tekstowe szablony (bez AI/NLP), PIN per użytkownik, tryb Admin z logami diagnostycznymi. Użytek domowy, LAN.
+CALICO — dziennik kalorii, makroskładników, wagi i obwodu pasa. Wpisy przez formularz albo tekstowe szablony (bez AI/NLP), PIN per użytkownik. Użytek domowy, LAN.
 
 - Backend: FastAPI + SQLAlchemy 2 + SQLite (`backend/app/`)
   - `main.py` — endpointy (cienkie), zależność `current_user`, mapowanie błędów domenowych (`InputError`→422, `ConflictError`→409, `NotFoundError`→404), serwowanie frontendu (`StaticFiles`)
@@ -10,10 +10,10 @@ CALICO — dziennik kalorii, makroskładników, wagi i obwodu pasa. Wpisy przez 
   - `plan.py` — ocena planu kalorycznego (trend masy, TDEE szacowane i z obserwacji, sugestia korekty celu); progi jako stałe na górze pliku
   - `clock.py` — jedyne źródło „teraz” i „dziś” (strefa `APP_TIMEZONE`); w testach podmieniane `clock.now_utc`
   - `db.py` — silnik, bootstrap, wersjonowane migracje (`MIGRATIONS`, klucz `schema_version` w `app_meta`)
-  - `models.py`, `schemas.py`, `security.py`, `diagnostics.py`
+  - `models.py`, `schemas.py`, `security.py`
 - Frontend: vanilla JS/HTML/CSS bez bundlera, serwowany przez FastAPI
-  - `index.html` — sprite ikon (`<symbol id="i-…">`), ekran blokady, powłoka z nawigacją, 5 widoków (`#view-today|log|progress|goals|more`, routing przez `location.hash`), panel admina, dolne panele `<dialog class="sheet">`
-  - `main.js` — sekcje: API, sesja/blokada, nawigacja, wykresy SVG (pierścień, sparkline, linia, słupki), widoki, panel wpisu, onboarding (D8), korekta celu, admin
+  - `index.html` — sprite ikon (`<symbol id="i-…">`), ekran blokady, powłoka z nawigacją, 5 widoków (`#view-today|log|progress|goals|more`, routing przez `location.hash`), dolne panele `<dialog class="sheet">`
+  - `main.js` — sekcje: API, sesja/blokada, nawigacja, wykresy SVG (pierścień, sparkline, linia, słupki), widoki, panel wpisu, kalendarz dziennika, onboarding (D8), korekta celu
   - `styles.css` — tokeny kolorów z `docs/UI design.md` (`:root`), karty hero/metric/info, mobile-first, boczna nawigacja od 960 px
   - `manifest.json`, `sw.js`, `icons/` (generowane: `scripts/generate_icons.py` z `branding/`), `fonts/` (Inter, OFL)
 - Infra: jeden kontener (`docker-compose.yml` → `backend/Dockerfile`, build context = katalog główny repo)
@@ -29,7 +29,8 @@ Kluczowe decyzje produktowe (nie zmieniaj bez zgody właściciela):
 - **D8: profil bez wartości domyślnych, uzupełnienie wymuszone przy pierwszym logowaniu.** Nowe endpointy danych muszą używać zależności `profiled_user` (428 bez profilu), a nie `current_user`,
 - polskie znaki w UI i szablonach (D4); parser akceptuje też zapis bez nich,
 - wpisy maks. na jutro, nie wcześniej niż 2000-01-01 (D5),
-- tylko LAN (D6).
+- tylko LAN (D6),
+- **D9: brak trybu administratora i logów diagnostycznych** – usunięte w całości; nie przywracaj bez zgody właściciela.
 
 ## Uruchamianie
 

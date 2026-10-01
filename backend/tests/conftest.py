@@ -4,8 +4,6 @@ from datetime import UTC, datetime
 
 _TMP_DIR = tempfile.mkdtemp(prefix="calico-tests-")
 os.environ["SQLITE_PATH"] = os.path.join(_TMP_DIR, "test.db")
-os.environ["DIAGNOSTICS_PATH"] = os.path.join(_TMP_DIR, "diagnostics")
-os.environ["ADMIN_PIN"] = "4321"
 os.environ["APP_TIMEZONE"] = "Europe/Warsaw"
 os.environ["DEFAULT_USER_PIN"] = "1234"
 os.environ["FRONTEND_DIR"] = os.path.join(_TMP_DIR, "no-frontend")

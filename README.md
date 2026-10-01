@@ -11,20 +11,19 @@ CALICO to prosty dziennik kalorii, makroskładników, wagi i obwodu pasa. Wpisy 
 - liczy sumę kcal i makro dnia oraz cel kcal (Mifflin-St Jeor × aktywność × korekta celu),
 - `Dziennik`: edycja, duplikowanie, przenoszenie i usuwanie pozycji, cofanie ostatniej zmiany, czyszczenie dnia,
 - `Raporty`: 7/30/90 dni, miesiąc, dowolny zakres — kalorie vs cel, bilans, najwyższy dzień, trend wagi (średnia 7-dniowa),
-- eksport wszystkich wpisów do CSV,
-- tryb diagnostyczny `Admin` (logi wiadomości tekstowych).
+- eksport wszystkich wpisów do CSV.
 
 ## Interfejs
 
 Mobile-first, ciemny motyw zgodny z brandingiem (`docs/UI design.md`): granatowe karty, akcenty cyan/teal, pierścień postępu jako główny motyw.
 
-- **Dziś** – pierścień kalorii (spożycie / cel), makroskładniki (udział w energii), „Dodaj posiłek”, karty wagi i obwodu pasa z mini-wykresami, regularność 7 dni („w celu” = ±10% celu kcal), cel kaloryczny i rekomendacja z oceny planu.
-- **Dziennik** – posiłki pogrupowane (Śniadanie, Obiad, Kolacja, Przekąski, Bilans dnia, Pomiary); dotknięcie pozycji otwiera akcje: edytuj, duplikuj, przenieś, usuń.
+- **Dziś** – przycisk „Dodaj posiłek” w prawym górnym rogu, pierścień kalorii (spożycie / cel), makroskładniki (udział w energii), karty wagi i obwodu pasa z mini-wykresami, regularność 7 dni („w celu” = ±10% celu kcal), cel kaloryczny i rekomendacja z oceny planu.
+- **Dziennik** – kalendarz miesięczny (kropka = dzień z wpisami: turkusowa – jedzenie, niebieska – tylko pomiary; klik wybiera dzień) oraz posiłki pogrupowane (Śniadanie, Obiad, Kolacja, Przekąski, Bilans dnia, Pomiary); dotknięcie pozycji otwiera akcje: edytuj, duplikuj, przenieś, usuń.
 - **Postępy** – 1M/3M/6M/1R/Wszystko/Własny: wykres wagi (z trendem 7 dni), obwodu, kalorii na tle celu, regularność tygodnia, historia dni.
 - **Cele** – aktualny plan, waga planu vs średnia, ocena planu i akceptacja sugestii.
-- **Więcej** – profil i plan, zmiana PIN-u, eksport CSV, panel administratora, konto.
+- **Więcej** – profil i plan, zmiana PIN-u, eksport CSV, konto.
 
-Nawigacja: dolny pasek na telefonie, boczny panel od 960 px. Dodawanie i edycja w dolnych panelach. Font Inter (OFL) jest dołączony lokalnie (`frontend/fonts/`) – aplikacja nie pobiera nic z internetu.
+Nawigacja (Dziś, Postępy, Cele, Dziennik, Więcej): dolny pasek na telefonie, boczny panel od 960 px. Dodawanie i edycja w dolnych panelach. Font Inter (OFL) jest dołączony lokalnie (`frontend/fonts/`) – aplikacja nie pobiera nic z internetu.
 
 ### PWA i ikony
 
@@ -116,8 +115,6 @@ Wolumen z danymi zostaje ten sam. Przy pierwszym starcie baza jest migrowana aut
 | `SQLITE_PATH` | `/data/calico.db` | ścieżka bazy |
 | `CORS_ORIGIN` | pusty | pusty = brak CORS (frontend i API na tym samym adresie) |
 | `DEFAULT_USER_PIN` | `1234` | PIN użytkownika tworzonego przy pierwszym starcie |
-| `ADMIN_PIN` | pusty | ustawienie włącza tryb `Admin` i logi diagnostyczne |
-| `DIAGNOSTICS_PATH` | `/data/diagnostics` | katalog logów JSONL |
 
 ## API
 
@@ -136,7 +133,7 @@ Użytkownicy i profil:
 Dni i wpisy (odczyt nigdy nie tworzy dnia w bazie):
 
 - `GET /api/days/current?user_id=`
-- `GET /api/days?user_id=&limit=` — tylko dni z wpisami
+- `GET /api/days?user_id=&limit=&date_from=&date_to=` — tylko dni z wpisami (zakres dat używa kalendarz Dziennika)
 - `GET /api/days/{date}?user_id=`
 - `POST /api/days/{date}/entries?user_id=` — `{"entry_type": "lunch", "kcal": 600, "carbs_g": 60, "fat_g": 20, "protein_g": 40}` lub `{"entry_type": "weight", "weight_kg": 82.4}`
 - `PATCH /api/days/{date}/entries/{id}?user_id=` — `{"entry": {...}}` albo `{"source_text": "..."}`
@@ -155,7 +152,7 @@ Raporty i eksport:
 
 Czat tekstowy: `POST /api/chat/message` — odpowiedź ma pole `kind`: `saved`, `info` albo `error`.
 
-Pozostałe: `GET /health`, `GET /api/meta` (dzisiejsza data serwera i strefa), `/api/admin/*`.
+Pozostałe: `GET /health`, `GET /api/meta` (dzisiejsza data serwera i strefa).
 
 ## Testy
 
@@ -165,17 +162,10 @@ docker run --rm -v "$PWD:/app" -w /app -e PYTHONPATH=/app python:3.12-slim \
   sh -c "pip install -q -r requirements.txt -r requirements-dev.txt && pytest -q -p no:cacheprovider"
 ```
 
-## Diagnostyka i Admin
-
-- Ustawienie `ADMIN_PIN` włącza zakładkę `Admin`.
-- Każda wiadomość tekstowa (zakładka Dzień → „Wklej tekst”) trafia do pliku JSONL per użytkownik w `DIAGNOSTICS_PATH`, z wynikiem `success` albo `error`.
-- Admin widzi pełną treść tych wiadomości (dane o diecie i wadze) — włączaj tylko, gdy jest potrzebny.
-- Usunięcie użytkownika usuwa też jego logi.
-
 ## Bezpieczeństwo
 
 - Aplikacja jest przeznaczona do sieci domowej. Nie wystawiaj jej do internetu bez reverse proxy z TLS i dodatkowego uwierzytelnienia.
-- PIN haszowany PBKDF2-SHA256 (120 tys. iteracji), porównanie PIN-u admina w czasie stałym.
+- PIN haszowany PBKDF2-SHA256 (120 tys. iteracji), porównanie w czasie stałym.
 - Nagłówki `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`.
 - SQLite w trybie `WAL`, `foreign_keys=ON`; sekrety poza repo (`.env` w `.gitignore`).
 

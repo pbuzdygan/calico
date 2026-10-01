@@ -113,16 +113,8 @@ class AuthVerifyIn(BaseModel):
     pin: str = Field(pattern=r"^\d{4,8}$")
 
 
-class AdminVerifyIn(BaseModel):
-    pin: str = Field(min_length=1, max_length=64)
-
-
 class AuthVerifyOut(BaseModel):
     ok: bool
-
-
-class AdminStatusOut(BaseModel):
-    enabled: bool
 
 
 class DayTotalsOut(BaseModel):
@@ -235,23 +227,3 @@ class ReportSummaryOut(BaseModel):
     weight_end_kg: float | None = None
     weight_change_kg: float | None = None
     points: list[ReportDayOut] = Field(default_factory=list)
-
-
-class DiagnosticsUserSummaryOut(BaseModel):
-    user_id: int
-    display_name: str
-    slug: str
-    entries_count: int
-    last_event_at: str | None = None
-    file_name: str
-
-
-class DiagnosticsLogEntryOut(BaseModel):
-    timestamp: str
-    user_id: int
-    user_slug: str
-    display_name: str
-    user_message: str
-    outcome: str
-    response: dict | None = None
-    error: str | None = None
