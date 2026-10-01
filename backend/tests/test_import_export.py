@@ -68,7 +68,14 @@ def test_import_simple_history(api):
         ]
     )
     result = do_import(api, content)
-    assert result == {"imported_days": 3, "imported_entries": 5, "skipped_dates": [], "errors": [], "error_count": 0}
+    assert {key: result[key] for key in ("imported_days", "imported_entries", "skipped_dates", "errors", "error_count")} == {
+        "imported_days": 3,
+        "imported_entries": 5,
+        "skipped_dates": [],
+        "errors": [],
+        "error_count": 0,
+    }
+    assert result["earliest_imported_date"] == "2026-06-01"  # dane sprzed startu planu (2026-06-15) -> podpowiedz
     day = api.day("2026-06-01")
     assert day["total_kcal"] == 2150 and day["total_protein_g"] == 140 and day["balance_mode"] is True
     assert sorted(entry["entry_type"] for entry in day["entries"]) == ["daily_balance", "weight"]

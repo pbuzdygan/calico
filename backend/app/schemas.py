@@ -57,6 +57,10 @@ class MacroTargetsOut(BaseModel):
     manual_carbs_g: float | None = None
 
 
+class PlanStartIn(BaseModel):
+    plan_started_on: date
+
+
 class TargetWeightIn(BaseModel):
     """null = brak wagi docelowej."""
 
@@ -197,6 +201,9 @@ class ImportResultOut(BaseModel):
     skipped_dates: list[date] = Field(default_factory=list)
     errors: list[ImportRowErrorOut] = Field(default_factory=list)
     error_count: int = 0
+    # Podpowiedz: zaimportowane dane siegaja przed start planu -> mozna przesunac start (Cele).
+    earliest_imported_date: date | None = None
+    plan_started_on: date | None = None
 
 
 class EntryValuesIn(BaseModel):

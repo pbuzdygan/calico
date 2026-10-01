@@ -102,12 +102,25 @@ def evaluate_plan(db: Session, user_id: int) -> PlanStatusOut:
     if profile is None:
         raise services.NotFoundError("Nie znaleziono profilu.")
     status = _evaluate(db, user_id, profile)
-    _add_forecast(status, profile)
+    _add_forecast(status, profile, _recent_rate_kg_per_week(db, user_id))
     return status
 
 
-def _add_forecast(status: PlanStatusOut, profile: Profile) -> None:
-    """Prognoza daty osiagniecia wagi docelowej: z trendu masy, a bez trendu - z tempa wynikajacego z planu.
+def _recent_rate_kg_per_week(db: Session, user_id: int) -> float | None:
+    """Tempo zmiany masy z ostatnich TREND_WINDOW_DAYS dni - niezaleznie od startu planu (prognoza, dane historyczne)."""
+    latest = services.latest_weight_entry(db, user_id)
+    if latest is None:
+        return None
+    last_date = latest.day_log.log_date
+    points = _measurements(db, user_id, last_date - timedelta(days=TREND_WINDOW_DAYS - 1), last_date)
+    if len(points) < TREND_MIN_MEASUREMENTS or (points[-1].log_date - points[0].log_date).days < TREND_MIN_SPAN_DAYS:
+        return None
+    return round(_slope_kg_per_day(points) * 7, 2)
+
+
+def _add_forecast(status: PlanStatusOut, profile: Profile, recent_rate: float | None) -> None:
+    """Prognoza daty osiagniecia wagi docelowej: z trendu ostatnich pomiarow (takze sprzed startu planu,
+    np. z importu), a bez trendu - z tempa wynikajacego z planu.
 
     Tylko informacja - nie wplywa na cel kcal (D2b).
     """
@@ -121,8 +134,8 @@ def _add_forecast(status: PlanStatusOut, profile: Profile) -> None:
     if abs(remaining) < TARGET_REACHED_KG:
         status.forecast_message = f"Waga docelowa {services.fmt_number(target)} kg osiągnięta."
         return
-    if status.observed_rate_kg_per_week is not None:
-        rate, basis = status.observed_rate_kg_per_week, "trend"
+    if recent_rate is not None:
+        rate, basis = recent_rate, "trend"
         source = f"przy obecnym trendzie ({_fmt_rate(rate)})"
     else:
         rate, basis = status.expected_rate_kg_per_week, "plan"
@@ -226,7 +239,7 @@ def _evaluate(db: Session, user_id: int, profile: Profile) -> PlanStatusOut:
 
     if low <= slope_week <= high:
         status.status = "on_track"
-        status.message = f"Plan działa: tempo {_fmt_rate(slope_week)} mieści się w zakresie {_fmt_rate(low)} … {_fmt_rate(high)}. Cel pozostaje: {target:.0f} kcal."
+        status.message = f"Plan działa: tempo {_fmt_rate(slope_week)} mieści się w zakresie {_fmt_rate(low)} … {_fmt_rate(high)} Cel pozostaje: {target:.0f} kcal."
         status.notes = notes
         return status
 

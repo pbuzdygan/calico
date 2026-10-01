@@ -297,6 +297,16 @@
                 <div class="kv"><span>Zapotrzebowanie na starcie planu</span><strong id="goalPlanTdee">–</strong></div>
                 <div class="kv"><span>Plan od</span><strong id="goalPlanSince">–</strong></div>
               </div>
+              <button id="planStartEditBtn" class="btn btn-quiet" type="button"><svg class="icon"><use href="#i-calendar" /></svg>Zmień datę startu planu</button>
+              <form id="planStartForm" class="plan-start-form" hidden novalidate>
+                <div class="inline-form">
+                  <input id="planStartInput" type="date" aria-label="Data startu planu" />
+                  <button id="planStartSaveBtn" class="btn btn-primary" type="submit">Zapisz</button>
+                  <button id="planStartCancelBtn" class="btn btn-quiet" type="button">Anuluj</button>
+                </div>
+                <p class="hint">Ustaw wcześniejszą datę, jeśli realizujesz plan dłużej niż korzystasz z CALICO (np. po imporcie danych historycznych). Cel kcal się nie zmienia; waga planu = średnia pomiarów z 7 dni przed tą datą.</p>
+                <p id="planStartStatus" class="form-status" aria-live="polite"></p>
+              </form>
             </article>
             <article class="card">
               <div class="card-head"><h2 class="card-title"><svg class="icon icon-teal"><use href="#i-flame" /></svg>Cele makro</h2><span id="macroModeChip" class="chip"></span></div>

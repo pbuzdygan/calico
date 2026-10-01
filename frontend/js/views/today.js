@@ -8,15 +8,17 @@ import { addDaysISO, daysBetween, fmt, fmtSigned, formatDayLabel, formatLongDay,
 
 export async function loadToday() {
   const today = todayISO();
-  const [detail, month, plan] = await Promise.all([
+  // Pomiary z całego roku: karta wagi/obwodu ma pokazywać zmianę także przy rzadkich lub zaimportowanych pomiarach.
+  const [detail, month, year, plan] = await Promise.all([
     api(`/days/${today}`),
     api("/reports/summary", { params: { days: 30 } }),
+    api("/reports/summary", { params: { days: 365 } }),
     profileApi("/plan"),
   ]);
   state.goalType = plan.goal_type;
   el.todayDate.textContent = formatLongDay(today).replace(/^./, (letter) => letter.toUpperCase());
   renderHero(detail);
-  renderMeasurementCards(month, plan.goal_type);
+  renderMeasurementCards(year, plan.goal_type);
   renderAdherenceCard(month);
   renderTargetCard(plan);
   renderRecommendation(plan);

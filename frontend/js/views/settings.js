@@ -146,6 +146,10 @@ function renderImportResult(result) {
     parts.push(`Pominięto ${result.skipped_dates.length} ${plural(result.skipped_dates.length, "dzień", "dni", "dni")} z istniejącymi wpisami: ${result.skipped_dates.map(formatDayLabel).join(", ")}.`);
   }
   el.importResult.innerHTML = `<p class="form-status success">${escapeHtml(parts.join(" "))}</p>`;
+  if (result.earliest_imported_date) {
+    // Dane sprzed startu planu: ocena planu i "zmiana od startu" ich nie obejmują, dopóki start nie zostanie przesunięty.
+    el.importResult.innerHTML += `<p class="hint">Zaimportowane dane sięgają ${escapeHtml(formatDayLabel(result.earliest_imported_date))} – wcześniej niż start planu (${escapeHtml(formatDayLabel(result.plan_started_on))}). Jeśli realizujesz plan od tamtej pory, zmień datę startu w <a href="#/goals">Celach</a>.</p>`;
+  }
   toast(parts[0], "success");
 }
 

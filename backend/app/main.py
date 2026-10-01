@@ -29,6 +29,7 @@ from .schemas import (
     MacroTargetsIn,
     PinChangeIn,
     PlanApplyIn,
+    PlanStartIn,
     PlanStatusOut,
     ProfileIn,
     ProfileOut,
@@ -256,6 +257,12 @@ def api_put_profile(payload: ProfileIn, user: User = Depends(current_user), db: 
 @app.put("/api/profile/{user_id}/macros", response_model=ProfileOut)
 def api_put_macro_targets(payload: MacroTargetsIn, user: User = Depends(profiled_user), db: Session = Depends(get_db)):
     services.set_macro_targets(db, services.get_profile(db, user.id), payload)
+    return _profile_out(db, user.id)
+
+
+@app.put("/api/profile/{user_id}/plan-start", response_model=ProfileOut)
+def api_put_plan_start(payload: PlanStartIn, user: User = Depends(profiled_user), db: Session = Depends(get_db)):
+    services.set_plan_start(db, services.get_profile(db, user.id), payload.plan_started_on)
     return _profile_out(db, user.id)
 
 

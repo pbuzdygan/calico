@@ -2,7 +2,7 @@ import { profileApi } from "../api.js";
 import { GOAL_LABELS, MACROS } from "../config.js";
 import { el, state } from "../state.js";
 import { toast, toastError, withBusy } from "../ui.js";
-import { escapeHtml, fmt, fmtSigned, formatDayLabel, plural } from "../util.js";
+import { escapeHtml, fmt, fmtSigned, formatDayLabel, plural, todayISO } from "../util.js";
 import { paceText } from "../views/today.js";
 
 // --- Cele -------------------------------------------------------------------------------------------
@@ -105,6 +105,7 @@ function renderPlan(plan) {
   el.goalTarget.innerHTML = `${fmt(plan.daily_kcal_target)}<small>kcal/dzień</small>`;
   el.goalPace.textContent = paceText(plan.expected_rate_kg_per_week);
   el.goalPlanTdee.textContent = `${fmt(plan.plan_tdee_kcal)} kcal`;
+  state.planStartedOn = plan.plan_started_on;
   el.goalPlanSince.textContent = `${formatDayLabel(plan.plan_started_on)} (${plan.plan_days} dni)`;
   el.goalStartWeight.textContent = `${fmt(plan.plan_weight_kg, 1)} kg`;
   el.goalTrendWeight.textContent = plan.trend_weight_kg !== null ? `${fmt(plan.trend_weight_kg, 1)} kg` : "–";
@@ -133,6 +134,44 @@ function renderPlan(plan) {
   el.planApplyBtn.hidden = plan.suggested_target_kcal === null;
   if (plan.suggested_target_kcal !== null) el.planApplyBtn.textContent = `Zastosuj sugestię: ${fmt(plan.suggested_target_kcal)} kcal`;
 }
+
+// --- Cele: data startu planu (dane historyczne, np. po imporcie) ------------------------------------------
+
+el.planStartEditBtn.addEventListener("click", () => {
+  el.planStartInput.value = state.planStartedOn || "";
+  el.planStartInput.max = todayISO();
+  el.planStartStatus.textContent = "";
+  el.planStartForm.hidden = false;
+  el.planStartEditBtn.hidden = true;
+  el.planStartInput.focus();
+});
+
+el.planStartCancelBtn.addEventListener("click", () => {
+  el.planStartForm.hidden = true;
+  el.planStartEditBtn.hidden = false;
+});
+
+el.planStartForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const value = el.planStartInput.value;
+  if (!value) {
+    el.planStartStatus.textContent = "Wybierz datę.";
+    el.planStartStatus.className = "form-status error";
+    return;
+  }
+  try {
+    await withBusy(el.planStartSaveBtn, async () => {
+      await profileApi("/plan-start", { method: "PUT", body: { plan_started_on: value } });
+      renderPlan(await profileApi("/plan"));
+      el.planStartForm.hidden = true;
+      el.planStartEditBtn.hidden = false;
+      toast(`Start planu: ${formatDayLabel(value)}. Ocena planu przeliczona.`, "success");
+    });
+  } catch (error) {
+    el.planStartStatus.textContent = error.message;
+    el.planStartStatus.className = "form-status error";
+  }
+});
 
 el.targetWeightForm.addEventListener("submit", async (event) => {
   event.preventDefault();

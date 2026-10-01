@@ -405,6 +405,47 @@ def set_macro_targets(db: Session, profile: Profile, payload: MacroTargetsIn) ->
     db.flush()
 
 
+def weights_between(db: Session, user_id: int, date_from: date, date_to: date) -> list[tuple[date, float]]:
+    rows = db.execute(
+        select(DayLog.log_date, DayEntry.weight_kg)
+        .join(DayEntry, DayEntry.day_log_id == DayLog.id)
+        .where(
+            DayLog.user_id == user_id,
+            DayEntry.entry_type == "weight",
+            DayEntry.weight_kg.is_not(None),
+            DayLog.log_date >= date_from,
+            DayLog.log_date <= date_to,
+        )
+        .order_by(DayLog.log_date.asc())
+    ).all()
+    return [(log_date, weight) for log_date, weight in rows]
+
+
+PLAN_START_WEIGHT_DAYS = 7
+
+
+def set_plan_start(db: Session, profile: Profile, started_on: date) -> None:
+    """Reczna data startu planu (np. po imporcie danych historycznych). Cel kcal i TDEE planu bez zmian (D2b).
+
+    Waga planu = srednia pomiarow z 7 dni konczacych sie w dniu startu; bez nich - pierwszy pomiar do 7 dni
+    po starcie; bez pomiarow - dotychczasowa waga planu.
+    """
+    if started_on > clock.today():
+        raise InputError("Start planu nie może być w przyszłości.")
+    if started_on < MIN_LOG_DATE:
+        raise InputError(f"Start planu nie może być wcześniejszy niż {fmt_date(MIN_LOG_DATE)}.")
+    window = PLAN_START_WEIGHT_DAYS - 1
+    before = weights_between(db, profile.user_id, started_on - timedelta(days=window), started_on)
+    after = weights_between(db, profile.user_id, started_on, started_on + timedelta(days=window))
+    if before:
+        profile.weight_kg = round(sum(weight for _, weight in before) / len(before), 1)
+    elif after:
+        profile.weight_kg = round(after[0][1], 1)
+    profile.plan_started_on = started_on
+    profile.updated_at = clock.utcnow_naive()
+    db.flush()
+
+
 def set_target_weight(db: Session, profile: Profile, target_weight_kg: float | None) -> None:
     """Waga docelowa sluzy tylko prognozie - nie zmienia planu kcal (D2b)."""
     profile.target_weight_kg = round(target_weight_kg, 1) if target_weight_kg is not None else None
@@ -1161,6 +1202,12 @@ def import_days_csv(db: Session, user_id: int, content: str) -> ImportResultOut:
             create_entry(db, user_id, entry)  # konczy sie refresh_day
         result.imported_days += 1
         result.imported_entries += len(entries)
+        if result.earliest_imported_date is None or log_date < result.earliest_imported_date:
+            result.earliest_imported_date = log_date
+    profile = get_profile(db, user_id)
+    result.plan_started_on = profile.plan_started_on if profile else None
+    if result.earliest_imported_date and result.plan_started_on and result.earliest_imported_date >= result.plan_started_on:
+        result.earliest_imported_date = None
     return result
 
 

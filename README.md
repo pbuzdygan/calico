@@ -135,8 +135,9 @@ Użytkownicy i profil:
 - `GET|PUT /api/profile/{user_id}` — `is_complete=false` i puste pola, dopóki profil nie zostanie zapisany; `PUT` wymaga wszystkich pól. `weight_kg` to waga planu, `current_weight_kg` to ostatni pomiar. `macro_targets`: obowiązujące cele `protein_g`, `fat_g`, `carbs_g` oraz `manual_*` (null = automatycznie)
 - `PUT /api/profile/{user_id}/macros` — `{"protein_g": 170}`; pola opcjonalne (brak/null = automatycznie, `{}` przywraca automatyczne), zakresy: białko 0–500, tłuszcze 0–400, węglowodany 0–1000 g
 - `POST /api/profile/{user_id}/preview` — podgląd BMR/TDEE/celu dla danych z formularza (bez zapisu, działa przed uzupełnieniem profilu)
+- `PUT /api/profile/{user_id}/plan-start` — `{"plan_started_on": "2026-03-01"}`; ręczna data startu planu (np. po imporcie danych historycznych): nie później niż dziś, cel kcal bez zmian, waga planu = średnia pomiarów z 7 dni przed tą datą (bez nich – pierwszy pomiar do 7 dni po niej)
 - `PUT /api/profile/{user_id}/target-weight` — `{"target_weight_kg": 85}` albo `null` (usuwa); 30–300 kg
-- `GET /api/profile/{user_id}/plan` — ocena planu (status, trend, TDEE, sugestia) oraz prognoza wagi docelowej: `target_weight_kg`, `target_weight_remaining_kg`, `forecast_date`, `forecast_basis` (`trend`/`plan`), `forecast_message`
+- `GET /api/profile/{user_id}/plan` — ocena planu (status, trend, TDEE, sugestia) oraz prognoza wagi docelowej: `target_weight_kg`, `target_weight_remaining_kg`, `forecast_date`, `forecast_basis` (`trend` – z pomiarów z ostatnich 28 dni, także sprzed startu planu / `plan`), `forecast_message`
 - `POST /api/profile/{user_id}/plan/apply` — `{"target_kcal": 2460}` akceptuje bieżącą sugestię (409, jeśli się zmieniła)
 
 Dni i wpisy (odczyt nigdy nie tworzy dnia w bazie):
@@ -159,7 +160,7 @@ Raporty i eksport:
 - `GET /api/reports/month?user_id=&month=RRRR-MM`
 - `GET /api/export?user_id=` — CSV „wiersz = dzień”: `Data;Waga (kg);Obwód pasa (cm);Kalorie (kcal);Białko (g);Węglowodany (g);Tłuszcze (g)` (średnik, UTF-8 z BOM, przecinek dziesiętny; posiłki zsumowane do dnia)
 - `GET /api/import/template?user_id=` — pusty szablon w tym samym formacie (wiersze zaczynające się od `#` są pomijane)
-- `POST /api/import?user_id=` — `{"content": "<tekst CSV>"}` → `{"imported_days", "imported_entries", "skipped_dates", "errors": [{"row", "message"}], "error_count"}`. Najpierw walidowany jest cały plik – przy błędach nic nie jest zapisywane. Dni z istniejącymi wpisami są pomijane. Kalorie i makro → „Bilans dnia” (makro opcjonalne), waga i obwód → osobne wpisy. Akceptuje też przecinek/tabulator jako separator, nagłówki bez polskich znaków i w dowolnej kolejności oraz daty `DD.MM.RRRR`
+- `POST /api/import?user_id=` — `{"content": "<tekst CSV>"}` → `{"imported_days", "imported_entries", "skipped_dates", "errors": [{"row", "message"}], "error_count", "earliest_imported_date", "plan_started_on"}` (`earliest_imported_date` tylko, gdy zaimportowane dane sięgają przed start planu – UI podpowiada wtedy zmianę daty startu). Najpierw walidowany jest cały plik – przy błędach nic nie jest zapisywane. Dni z istniejącymi wpisami są pomijane. Kalorie i makro → „Bilans dnia” (makro opcjonalne), waga i obwód → osobne wpisy. Akceptuje też przecinek/tabulator jako separator, nagłówki bez polskich znaków i w dowolnej kolejności oraz daty `DD.MM.RRRR`
 
 Czat tekstowy: `POST /api/chat/message` — odpowiedź ma pole `kind`: `saved`, `info` albo `error`.
 
