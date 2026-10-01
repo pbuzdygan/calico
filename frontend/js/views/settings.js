@@ -6,9 +6,9 @@ import { $, el, state } from "../state.js";
 import { toast, toastError, withBusy } from "../ui.js";
 import { escapeHtml, fmt, formatDayLabel, parseNumberInput, plural } from "../util.js";
 
-// --- Więcej: profil, PIN, eksport, konto ------------------------------------------------------------
+// --- Ustawienia: profil, PIN, eksport/import, konto ------------------------------------------------------------
 
-export async function loadMore() {
+export async function loadSettings() {
   const profile = await profileApi();
   if (!profile.is_complete) {
     openOnboarding();
@@ -80,7 +80,7 @@ el.profileForm.addEventListener("submit", async (event) => {
   try {
     await withBusy(button, async () => {
       await profileApi("", { method: "PUT", body: result.payload });
-      await loadMore();
+      await loadSettings();
       el.profileStatus.textContent = "Zapisano profil – utworzono nowy plan kaloryczny.";
       el.profileStatus.className = "form-status span-2 success";
     });
@@ -176,7 +176,7 @@ el.importFile.addEventListener("change", () => {
   });
 });
 
-el.logoutBtn.addEventListener("click", () => {
+el.navLogoutBtn.addEventListener("click", () => {
   location.hash = "";
   lockUser();
 });

@@ -52,5 +52,5 @@ export const ENTRY_HINTS = {
   waist: "Jeden pomiar na dzień – nowy wpis nadpisuje poprzedni.",
 };
 
-export const VIEWS = ["today", "log", "progress", "goals", "more"];
+export const VIEWS = ["today", "log", "progress", "goals", "settings"];
 

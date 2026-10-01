@@ -21,9 +21,9 @@ Mobile-first, ciemny motyw zgodny z brandingiem (`docs/UI design.md`): granatowe
 - **Dziennik** – kalendarz miesięczny (kropka = dzień z wpisami: turkusowa – jedzenie, niebieska – tylko pomiary; klik wybiera dzień) oraz posiłki pogrupowane (Śniadanie, Obiad, Kolacja, Przekąski, Bilans dnia, Pomiary); dotknięcie pozycji otwiera akcje: edytuj, duplikuj, przenieś, usuń.
 - **Postępy** – 1M/3M/6M/1R/Wszystko/Własny: wykres wagi (z trendem 7 dni), obwodu, kalorii na tle celu, regularność tygodnia, historia dni.
 - **Cele** – aktualny plan, waga planu vs średnia, ocena planu i akceptacja sugestii.
-- **Więcej** – profil i plan, zmiana PIN-u, eksport/import CSV, konto.
+- **Ustawienia** – profil i plan, zmiana PIN-u, eksport/import CSV, usunięcie konta.
 
-Nawigacja (Dziś, Postępy, Cele, Dziennik, Więcej): dolny pasek na telefonie, boczny panel od 960 px. Dodawanie i edycja w dolnych panelach. Font Inter (OFL) jest dołączony lokalnie (`frontend/fonts/`) – aplikacja nie pobiera nic z internetu.
+Nawigacja (Dziś, Postępy, Cele, Dziennik, Ustawienia, Wyloguj): dolny pasek na telefonie, boczny panel od 960 px (z nazwą zalogowanego użytkownika nad „Wyloguj”). Dodawanie i edycja w dolnych panelach. Font Inter (OFL) jest dołączony lokalnie (`frontend/fonts/`) – aplikacja nie pobiera nic z internetu.
 
 ### PWA i ikony
 
@@ -97,7 +97,7 @@ cp .env.example .env
 docker compose up --build -d
 ```
 
-Otwórz `http://localhost:8080`. Przy pierwszym starcie nie ma żadnego użytkownika ani PIN-u domyślnego – aplikacja prosi o utworzenie pierwszego użytkownika (nazwa i PIN), a potem wymusza uzupełnienie profilu. PIN można zmienić w zakładce `Więcej`.
+Otwórz `http://localhost:8080`. Przy pierwszym starcie nie ma żadnego użytkownika ani PIN-u domyślnego – aplikacja prosi o utworzenie pierwszego użytkownika (nazwa i PIN), a potem wymusza uzupełnienie profilu. PIN można zmienić w zakładce `Ustawienia`.
 
 Istniejące instalacje zachowują swoich użytkowników (także dawnego „Domyślnego Użytkownika” – można go usunąć po założeniu własnego konta). Klucz `DEFAULT_USER_PIN` w `.env` jest ignorowany i można go usunąć.
 

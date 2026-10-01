@@ -2,7 +2,7 @@ import { profileApi } from "../api.js";
 import { GOAL_LABELS, MACROS } from "../config.js";
 import { el, state } from "../state.js";
 import { toast, toastError, withBusy } from "../ui.js";
-import { escapeHtml, fmt, fmtSigned, formatDayLabel } from "../util.js";
+import { escapeHtml, fmt, fmtSigned, formatDayLabel, plural } from "../util.js";
 import { paceText } from "../views/today.js";
 
 // --- Cele -------------------------------------------------------------------------------------------
@@ -156,7 +156,21 @@ el.targetWeightForm.addEventListener("submit", async (event) => {
   }
 });
 
-el.planRefreshBtn.addEventListener("click", () => withBusy(el.planRefreshBtn, loadGoals).catch(toastError));
+// Ręczne przeliczenie: wynik musi być widoczny (godzina, podstawa, wniosek), inaczej wygląda, jakby nic się nie stało.
+el.planRefreshBtn.addEventListener("click", () =>
+  withBusy(el.planRefreshBtn, async () => {
+    const plan = await profileApi("/plan");
+    renderPlan(plan);
+    const time = new Date().toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
+    const label = PLAN_STATUS_LABELS[plan.status] || plan.status;
+    const conclusion = plan.suggested_target_kcal !== null ? `sugestia: ${fmt(plan.suggested_target_kcal)} kcal/dzień` : "cel bez zmian";
+    el.planCheckedAt.textContent = `Przeliczono o ${time}: ${plan.measurements_count} ${plural(plan.measurements_count, "pomiar", "pomiary", "pomiarów")} wagi od ${formatDayLabel(plan.plan_started_on)} – ${label.toLowerCase()}, ${conclusion}.`;
+    el.planCard.classList.remove("refreshed");
+    void el.planCard.offsetWidth; // restart animacji
+    el.planCard.classList.add("refreshed");
+    toast(`Ocena planu przeliczona: ${label} – ${conclusion}.`, "success");
+  }).catch(toastError)
+);
 
 el.planApplyBtn.addEventListener("click", async () => {
   const target = state.planSuggestion;

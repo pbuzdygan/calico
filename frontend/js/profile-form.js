@@ -3,7 +3,7 @@ import { enterApp, lockUser } from "./auth.js";
 import { el, state } from "./state.js";
 import { toast, withBusy } from "./ui.js";
 import { fmt, fmtSigned } from "./util.js";
-import { readProfilePayload } from "./views/more.js";
+import { readProfilePayload } from "./views/settings.js";
 
 // --- korekta celu: znak zależny od celu i podgląd wyliczeń ------------------------------------------------
 

@@ -1,7 +1,7 @@
 // Calico – punkt wejścia (index.html: <script type="module" src="/js/main.js">). Moduły bez bundlera:
 //   config.js   stałe domenowe            state.js  el (elementy DOM), state     util.js  formatowanie, daty
 //   ui.js       toasty, withBusy, panele  api.js    fetchJSON, sesja             auth.js  blokada, użytkownicy
-//   nav.js      routing (location.hash)   charts.js wykresy SVG                  views/*  widoki Dziś…Więcej
+//   nav.js      routing (location.hash)   charts.js wykresy SVG                  views/*  widoki Dziś…Ustawienia
 //   entry-sheet.js  panel wpisu i akcje pozycji   profile-form.js  korekta celu, onboarding (D8)
 // Moduły z obsługą zdarzeń importujemy jawnie (rejestrują listenery przy ładowaniu).
 import "./nav.js";
@@ -11,7 +11,7 @@ import "./views/today.js";
 import "./views/log.js";
 import "./views/progress.js";
 import "./views/goals.js";
-import "./views/more.js";
+import "./views/settings.js";
 import { readSession } from "./api.js";
 import { loadUsers, showScreen, startSession } from "./auth.js";
 import { RING_CIRCUMFERENCE } from "./config.js";

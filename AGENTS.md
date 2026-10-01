@@ -12,8 +12,8 @@ CALICO — dziennik kalorii, makroskładników, wagi i obwodu pasa. Wpisy przez 
   - `db.py` — silnik, bootstrap, wersjonowane migracje (`MIGRATIONS`, klucz `schema_version` w `app_meta`)
   - `models.py`, `schemas.py`, `security.py`
 - Frontend: vanilla JS/HTML/CSS bez bundlera, serwowany przez FastAPI
-  - `index.html` — sprite ikon (`<symbol id="i-…">`), ekran blokady, powłoka z nawigacją, 5 widoków (`#view-today|log|progress|goals|more`, routing przez `location.hash`), dolne panele `<dialog class="sheet">`
-  - `js/` — moduły ES bez bundlera (punkt wejścia `js/main.js`, opis modułów w jego nagłówku): `config.js` (stałe), `state.js` (`el`, `state`), `util.js`, `ui.js` (toasty, `withBusy`, panele), `api.js` (`fetchJSON`, sesja), `auth.js` (blokada, użytkownicy), `nav.js`, `charts.js` (SVG), `views/{today,log,progress,goals,more}.js`, `entry-sheet.js` (panel wpisu, akcje pozycji), `profile-form.js` (korekta celu, onboarding D8). Nowy plik JS dopisz do `SHELL` w `sw.js` i podbij `CACHE`
+  - `index.html` — sprite ikon (`<symbol id="i-…">`), ekran blokady, powłoka z nawigacją, 5 widoków (`#view-today|log|progress|goals|settings`, routing przez `location.hash`), dolne panele `<dialog class="sheet">`
+  - `js/` — moduły ES bez bundlera (punkt wejścia `js/main.js`, opis modułów w jego nagłówku): `config.js` (stałe), `state.js` (`el`, `state`), `util.js`, `ui.js` (toasty, `withBusy`, panele), `api.js` (`fetchJSON`, sesja), `auth.js` (blokada, użytkownicy), `nav.js`, `charts.js` (SVG), `views/{today,log,progress,goals,settings}.js`, `entry-sheet.js` (panel wpisu, akcje pozycji), `profile-form.js` (korekta celu, onboarding D8). Nowy plik JS dopisz do `SHELL` w `sw.js` i podbij `CACHE`
   - `styles.css` — tokeny kolorów z `docs/UI design.md` (`:root`), karty hero/metric/info, mobile-first, boczna nawigacja od 960 px
   - `manifest.json`, `sw.js`, `icons/` (generowane: `scripts/generate_icons.py` z `branding/`), `fonts/` (Inter, OFL)
 - Infra: jeden kontener (`docker-compose.yml` → `backend/Dockerfile`, build context = katalog główny repo)

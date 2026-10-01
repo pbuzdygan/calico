@@ -3,7 +3,7 @@ import { $, el, state } from "./state.js";
 import { toastError } from "./ui.js";
 import { loadGoals } from "./views/goals.js";
 import { loadLog } from "./views/log.js";
-import { loadMore } from "./views/more.js";
+import { loadSettings } from "./views/settings.js";
 import { loadProgress } from "./views/progress.js";
 import { loadToday } from "./views/today.js";
 
@@ -11,6 +11,7 @@ import { loadToday } from "./views/today.js";
 
 export function viewFromHash() {
   const name = location.hash.replace(/^#\/?/, "");
+  if (name === "more") return "settings"; // stary adres (zakładki, PWA)
   return VIEWS.includes(name) ? name : "today";
 }
 
@@ -31,7 +32,7 @@ export async function loadView(view) {
   if (view === "log") return loadLog();
   if (view === "progress") return loadProgress();
   if (view === "goals") return loadGoals();
-  if (view === "more") return loadMore();
+  if (view === "settings") return loadSettings();
   return undefined;
 }
 

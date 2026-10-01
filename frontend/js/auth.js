@@ -97,7 +97,8 @@ export async function startSession(session) {
 
 export async function enterApp() {
   state.logDate = todayISO();
-  el.moreUser.textContent = state.userName;
+  el.settingsUser.textContent = state.userName;
+  el.navUser.textContent = state.userName;
   const view = viewFromHash();
   state.view = view;
   applyViewVisibility(view);
