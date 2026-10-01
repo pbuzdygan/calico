@@ -2,7 +2,7 @@
 
 ![Calico – Conscious habits. Real results.](branding/calico_banner.png)
 
-CALICO is a simple log for calories, macronutrients, body weight and waist circumference. Entries are added through a form or by pasting a text template. The app uses no AI and no natural-language parser. It is meant for home use on a LAN.
+CALICO is a simple log for calories, macronutrients, body weight and waist circumference. Entries are added through a form or by pasting a text template. The app uses no AI and no natural-language parser. It is made for home use on your own network and can also be exposed to the internet behind a reverse proxy with HTTPS – see [Security](#security).
 
 ## What it does
 
@@ -133,7 +133,8 @@ docker compose -f docker-compose-local-build.yml logs calico --tail=100
 
 ### Notes
 
-- The app runs in a single container: FastAPI serves both the API and the frontend files. Data is stored in the `calico_data` volume (`/data/calico.db`). The container runs as an unprivileged user (UID 1000) with a read-only root filesystem; only `/data` and `/tmp` are writable.
+- The app runs in a single container: FastAPI serves both the API and the frontend files. Data is stored in the `calico_data` volume (`/data/calico.db`). The root filesystem is read-only; only `/data` and `/tmp` are writable.
+- **User and group (`PUID` / `PGID`, default `1000:1000`).** The app runs as this user, never as root. On start the container gives `/data` to `PUID:PGID` if needed and then drops root rights. To keep the data in a host directory with your own permissions, set `PUID`/`PGID` in `.env` to the output of `id -u` / `id -g` and replace the volume in `docker-compose.yml` with a bind mount, e.g. `- ./data:/data`.
 - Existing installations keep their users (including the former "Domyślny Użytkownik" default user – it can be deleted after creating your own account). Old keys in `.env` (`APP_ENV`, `DEFAULT_USER_PIN`, `ADMIN_PIN`, `DIAGNOSTICS_PATH`) are ignored and can be removed.
 - Upgrading from the old Caddy-based version (two containers, `backend` + `proxy`): add `--remove-orphans` to the first `docker compose up`. The data volume stays the same.
 
@@ -143,7 +144,7 @@ Container images are built **only when a GitHub release is published** – never
 
 | Release tag | Must point to a commit on | Image tags |
 |---|---|---|
-| `vX.Y.Z`, e.g. `v0.1.0` | `main` | `:X.Y.Z`, `:latest` |
+| `X.Y.Z` (digits only, no `v`), e.g. `0.1.0` | `main` | `:X.Y.Z`, `:latest` |
 | `devX.Y.Z`, e.g. `dev0.2.0`, `dev0.2.0-rc1` | `dev` | `:devX.Y.Z`, `:dev_latest` |
 
 The workflow runs the tests first and stops before pushing anything if the tag matches neither pattern, if the tagged commit is not on the channel's branch, or if a stable tag is published as a pre-release. Mark dev releases as pre-releases so GitHub keeps showing the latest stable one as "Latest". Stable and dev images never share tags or build cache.
@@ -156,6 +157,7 @@ Every key is optional; `.env.example` explains each one in detail.
 
 | Variable | Default | Description |
 |---|---|---|
+| `PUID`, `PGID` | `1000` | user and group id the app runs as; owner of the files in `/data` |
 | `APP_TIMEZONE` | `Europe/Warsaw` | time zone used to determine "today" (IANA name) |
 | `SQLITE_PATH` | `/data/calico.db` | database path; both compose files set it to the data volume |
 | `ALLOW_SIGNUP` | `true` | `false` = new accounts can only be created on first launch (when no user exists); `POST /api/users` then returns `403`. Use `false` on any internet-facing instance |
@@ -222,7 +224,7 @@ Full check as in CI (ruff + pytest in a container, `node --check` of frontend mo
 
 ## Security
 
-CALICO was designed for a home network. What it protects against, and what you need to add yourself before exposing it to the internet:
+CALICO works on a home network out of the box and can be exposed to the internet behind a reverse proxy. What it protects against, and what you need to add yourself before exposing it to the internet:
 
 **Built in**
 
@@ -230,7 +232,7 @@ CALICO was designed for a home network. What it protects against, and what you n
 - After 5 failed PINs the account is temporarily locked (5 → 10 → 20 → 40 → 60 min).
 - After unlocking, the browser receives a signed session token (HMAC-SHA256, valid for `SESSION_TTL_HOURS`) kept in `sessionStorage`: the session survives a tab reload (e.g. when a phone suspends the browser in the background) and disappears when the tab is closed or on logout. Changing the PIN invalidates all earlier sessions.
 - `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy` headers; no `Server` header; API documentation disabled by default; request body size limit.
-- Container: unprivileged user, read-only root filesystem, all Linux capabilities dropped, `no-new-privileges` (see `docker-compose.yml`).
+- Container: the app runs as an unprivileged user (`PUID`/`PGID`), read-only root filesystem, all Linux capabilities dropped except `CHOWN`/`SETUID`/`SETGID` used once by the start-up script (the app process has none), `no-new-privileges` (see `docker-compose.yml`).
 - SQLite in `WAL` mode, `foreign_keys=ON`; secrets kept out of the repo (`.env` in `.gitignore`).
 
 **Known limits** – acceptable on a trusted home network, not on the open internet:

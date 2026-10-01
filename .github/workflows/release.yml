@@ -1,7 +1,7 @@
 # Container image build - ONLY when a GitHub release is published (never on push).
 #
 # The release tag decides the channel; stable and dev images never mix:
-#   main channel: tag vX.Y.Z (or X.Y.Z) on a commit from main  -> :X.Y.Z, :latest
+#   main channel: tag X.Y.Z (digits only, e.g. 0.1.0) on a commit from main -> :X.Y.Z, :latest
 #   dev channel:  tag devX.Y.Z (e.g. dev0.2.0, dev0.2.0-rc1) on a commit from dev -> :devX.Y.Z, :dev_latest
 # A tag that matches neither pattern, a tag whose commit is not on the channel's branch,
 # or a stable tag published as a pre-release fails the workflow before anything is pushed.
@@ -43,7 +43,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          if [[ "$TAG" =~ ^v?([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+          if [[ "$TAG" =~ ^([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
             channel=main
             version="${BASH_REMATCH[1]}"
             version_tag="$version"
@@ -52,7 +52,7 @@ jobs:
               echo "::error::Stable tag $TAG is published as a pre-release. Stable releases must not be pre-releases; use a devX.Y.Z tag for the dev channel."
               exit 1
             fi
-          elif [[ "$TAG" =~ ^dev-?v?([0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.]+)?)$ ]]; then
+          elif [[ "$TAG" =~ ^dev([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?)$ ]]; then
             channel=dev
             version="${BASH_REMATCH[1]}"
             version_tag="dev$version"
@@ -61,7 +61,7 @@ jobs:
               echo "::warning::Dev release $TAG is not marked as a pre-release, so GitHub shows it as the repository's latest release."
             fi
           else
-            echo "::error::Tag '$TAG' does not match vX.Y.Z (main) or devX.Y.Z (dev). No image was built."
+            echo "::error::Tag '$TAG' does not match X.Y.Z (main) or devX.Y.Z (dev). No image was built."
             exit 1
           fi
 

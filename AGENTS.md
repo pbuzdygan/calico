@@ -2,7 +2,7 @@
 
 ## Projekt
 
-CALICO — dziennik kalorii, makroskładników, wagi i obwodu pasa. Wpisy przez formularz albo tekstowe szablony (bez AI/NLP), PIN per użytkownik. Użytek domowy, LAN.
+CALICO — dziennik kalorii, makroskładników, wagi i obwodu pasa. Wpisy przez formularz albo tekstowe szablony (bez AI/NLP), PIN per użytkownik. Użytek domowy (LAN), możliwe wystawienie do internetu za reverse proxy z TLS (D6).
 
 - Backend: FastAPI + SQLAlchemy 2 + SQLite (`backend/app/`)
   - `main.py` — endpointy (cienkie), zależność `current_user`, mapowanie błędów domenowych (`InputError`→422, `ConflictError`→409, `NotFoundError`→404), serwowanie frontendu (`StaticFiles`)
@@ -16,9 +16,9 @@ CALICO — dziennik kalorii, makroskładników, wagi i obwodu pasa. Wpisy przez 
   - `js/` — moduły ES bez bundlera (punkt wejścia `js/main.js`, opis modułów w jego nagłówku): `config.js` (stałe), `state.js` (`el`, `state`), `util.js`, `ui.js` (toasty, `withBusy`, panele), `api.js` (`fetchJSON`, sesja), `auth.js` (blokada, użytkownicy), `nav.js`, `charts.js` (SVG), `views/{today,log,progress,goals,settings}.js`, `entry-sheet.js` (panel wpisu, akcje pozycji), `profile-form.js` (korekta celu, onboarding D8). Nowy plik JS dopisz do `SHELL` w `sw.js` i podbij `CACHE`
   - `styles.css` — tokeny kolorów z `docs/UI design.md` (`:root`), karty hero/metric/info, mobile-first, boczna nawigacja od 960 px
   - `manifest.json`, `sw.js`, `icons/` (generowane: `scripts/generate_icons.py` z `branding/`), `fonts/` (Inter, OFL)
-- Infra: jeden kontener, `backend/Dockerfile` (build context = katalog główny repo, kod tylko do odczytu, zapisywalne `/data` i `/tmp`)
+- Infra: jeden kontener, `backend/Dockerfile` (build context = katalog główny repo, kod tylko do odczytu, zapisywalne `/data` i `/tmp`); `backend/docker-entrypoint.sh` ustawia właściciela `/data` na `PUID:PGID` (domyślnie 1000:1000) i uruchamia aplikację przez `setpriv` jako ten użytkownik – nigdy jako root
   - `docker-compose.yml` – wdrożenie z opublikowanego obrazu `ghcr.io/pbuzdygan/calico`; `docker-compose-local-build.yml` – budowanie i testy lokalne (te same opcje utwardzenia: `read_only`, `cap_drop`, `no-new-privileges`)
-  - `.github/workflows/ci.yml` – testy (push, PR, wywoływany też przez release); `.github/workflows/release.yml` – obraz amd64/arm64 **tylko** po publikacji release'u: tag `vX.Y.Z` z `main` → `:X.Y.Z` + `:latest`, tag `devX.Y.Z` z `dev` → `:devX.Y.Z` + `:dev_latest`; kanały się nie mieszają (walidacja tagu i gałęzi)
+  - `.github/workflows/ci.yml` – testy (push, PR, wywoływany też przez release); `.github/workflows/release.yml` – obraz amd64/arm64 **tylko** po publikacji release'u: tag `X.Y.Z` (same cyfry, bez `v`) z `main` → `:X.Y.Z` + `:latest`, tag `devX.Y.Z` z `dev` → `:devX.Y.Z` + `:dev_latest`; kanały się nie mieszają (walidacja tagu i gałęzi)
 
 ## Aktualny stan i backlog
 
@@ -33,7 +33,7 @@ Kluczowe decyzje produktowe (nie zmieniaj bez zgody właściciela):
 - polskie znaki w UI i szablonach (D4); parser akceptuje też zapis bez nich,
 - **D12: aplikacja dwujęzyczna PL/EN.** Polski jest językiem źródłowym, angielski to słownik. Każdy nowy tekst od razu w obu językach (zasady w „Zasady pracy”),
 - wpisy maks. na jutro, nie wcześniej niż 2000-01-01 (D5),
-- tylko LAN (D6),
+- **D6: dom (LAN) i internet.** Obraz jest publiczny i może być wystawiony do internetu za reverse proxy z TLS. Zabezpieczenia nie mogą zakładać zaufanej sieci; wygody dla domu tylko jako przełączniki w `.env` z zaleceniem dla instancji publicznej,
 - **D9: brak trybu administratora i logów diagnostycznych** – usunięte w całości; nie przywracaj bez zgody właściciela.
 - **D10: brak użytkownika i PIN-u domyślnego.** Pierwszy start = ekran „Utwórz użytkownika”; nie dodawaj bootstrapu konta ani `DEFAULT_USER_PIN`.
 

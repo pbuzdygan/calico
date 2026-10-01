@@ -11,6 +11,7 @@ All notable changes to CALICO are listed here, newest first, described from the 
 ### Improvements
 
 - **Safer to run on your network or the internet.** The server components were updated to fix known security issues. The app now refuses oversized requests, sends stricter browser security rules and reveals less about itself. The container runs with the minimum permissions it needs, so even a flaw in the app could not change its own files.
+- **Choose which user the app runs as.** Set `PUID` and `PGID` to your own user and group, and the app's data files get the same owner as the rest of your files – no more permission problems when you keep the data in a folder on your server.
 - **Clearer setup.** Every setting in the example configuration file is explained in plain words, with recommendations for instances reachable from the internet. Settings that did nothing have been removed.
 
 ## [0.1.0] – 2026-10-01

@@ -18,13 +18,19 @@ services:
     volumes:
       - calico_data:/data
     restart: unless-stopped
-    # Hardening: read-only root filesystem (only /data and /tmp are writable),
-    # no Linux capabilities, no privilege escalation, limited number of processes.
+    # Hardening: read-only root filesystem (only /data and /tmp are writable), no Linux capabilities
+    # except the three needed at start-up, no privilege escalation, limited number of processes.
+    # The app runs as PUID:PGID from .env (default 1000:1000), never as root.
     read_only: true
     tmpfs:
       - /tmp
     cap_drop:
       - ALL
+    cap_add:
+      # only for the start-up script: set the owner of /data and switch to PUID:PGID
+      - CHOWN
+      - SETUID
+      - SETGID
     security_opt:
       - no-new-privileges:true
     pids_limit: 100
