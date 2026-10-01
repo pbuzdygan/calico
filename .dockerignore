@@ -1,0 +1,19 @@
+# Obraz kopiuje tylko backend/requirements.txt, backend/app i frontend - reszta nie trafia do kontekstu.
+.git
+.github
+.env
+.env.*
+!.env.example
+data
+docs
+branding
+scripts
+backend/tests
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+**/*.db
+**/*.db-*
+*.md
+docker-compose*.yml

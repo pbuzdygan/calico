@@ -1,0 +1,133 @@
+# Container image build - ONLY when a GitHub release is published (never on push).
+#
+# The release tag decides the channel; stable and dev images never mix:
+#   main channel: tag X.Y.Z (digits only, e.g. 0.1.0) on a commit from main -> :X.Y.Z, :latest
+#   dev channel:  tag devX.Y.Z (e.g. dev0.2.0, dev0.2.0-rc1) on a commit from dev -> :devX.Y.Z, :dev_latest
+# A tag that matches neither pattern, a tag whose commit is not on the channel's branch,
+# or a stable tag published as a pre-release fails the workflow before anything is pushed.
+# Images: linux/amd64 and linux/arm64, ghcr.io/<owner>/<repo>. Tests (ci.yml) must pass first.
+name: Release image
+
+on:
+  release:
+    types: [published]
+
+permissions: {}
+
+concurrency:
+  group: release-image-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Resolve channel and tags
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      channel: ${{ steps.resolve.outputs.channel }}
+      version: ${{ steps.resolve.outputs.version }}
+      version_tag: ${{ steps.resolve.outputs.version_tag }}
+      latest_tag: ${{ steps.resolve.outputs.latest_tag }}
+      image: ${{ steps.resolve.outputs.image }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: resolve
+        name: Check tag pattern and branch
+        shell: bash
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [[ "$TAG" =~ ^([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            channel=main
+            version="${BASH_REMATCH[1]}"
+            version_tag="$version"
+            latest_tag=latest
+            if [[ "$PRERELEASE" == "true" ]]; then
+              echo "::error::Stable tag $TAG is published as a pre-release. Stable releases must not be pre-releases; use a devX.Y.Z tag for the dev channel."
+              exit 1
+            fi
+          elif [[ "$TAG" =~ ^dev([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?)$ ]]; then
+            channel=dev
+            version="${BASH_REMATCH[1]}"
+            version_tag="dev$version"
+            latest_tag=dev_latest
+            if [[ "$PRERELEASE" != "true" ]]; then
+              echo "::warning::Dev release $TAG is not marked as a pre-release, so GitHub shows it as the repository's latest release."
+            fi
+          else
+            echo "::error::Tag '$TAG' does not match X.Y.Z (main) or devX.Y.Z (dev). No image was built."
+            exit 1
+          fi
+
+          sha="$(git rev-list -n 1 "refs/tags/$TAG")"
+          git fetch --no-tags origin "refs/heads/$channel:refs/remotes/origin/$channel"
+          if ! git merge-base --is-ancestor "$sha" "origin/$channel"; then
+            echo "::error::Tag $TAG points to $sha, which is not on branch '$channel'. Create $channel releases from the $channel branch."
+            exit 1
+          fi
+
+          image="ghcr.io/${REPOSITORY,,}"
+          {
+            echo "channel=$channel"
+            echo "version=$version"
+            echo "version_tag=$version_tag"
+            echo "latest_tag=$latest_tag"
+            echo "image=$image"
+          } >> "$GITHUB_OUTPUT"
+          echo "### $channel channel: \`$image:$version_tag\`, \`$image:$latest_tag\` (commit \`$sha\`)" >> "$GITHUB_STEP_SUMMARY"
+
+  test:
+    name: Tests
+    needs: resolve
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  image:
+    name: Build and push (amd64, arm64)
+    needs: [resolve, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ needs.resolve.outputs.image }}
+          flavor: |
+            latest=false
+          tags: |
+            type=raw,value=${{ needs.resolve.outputs.version_tag }}
+            type=raw,value=${{ needs.resolve.outputs.latest_tag }}
+          labels: |
+            org.opencontainers.image.title=CALICO
+            org.opencontainers.image.description=Self-hosted calorie, macro, weight and waist log
+            org.opencontainers.image.version=${{ needs.resolve.outputs.version_tag }}
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: backend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true
+          # separate build cache per channel - main and dev never share layers from the cache
+          cache-from: type=gha,scope=${{ needs.resolve.outputs.channel }}
+          cache-to: type=gha,mode=max,scope=${{ needs.resolve.outputs.channel }}

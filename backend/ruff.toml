@@ -1,0 +1,9 @@
+# Lint backendu (T3.7): uruchamiany w CI i lokalnie (scripts/check.sh).
+target-version = "py312"
+line-length = 140
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+# E501: dlugie linie (komunikaty po polsku, f-stringi) - formatowania nie wymuszamy.
+# B008: Depends(...) w argumentach domyslnych to standardowy wzorzec FastAPI.
+ignore = ["E501", "B008"]

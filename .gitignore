@@ -1,0 +1,10 @@
+.env
+*.pyc
+__pycache__/
+.pytest_cache/
+.DS_Store
+/data/
+.ruff_cache/
+
+# fixture testu migracji (globalny gitignore moze wykluczac *.sql)
+!backend/tests/fixtures/*.sql
