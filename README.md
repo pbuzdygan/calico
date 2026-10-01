@@ -155,7 +155,7 @@ Container images are built **only when a GitHub release is published** – never
 
 The workflow runs the tests first and stops before pushing anything if the tag matches neither pattern, if the tagged commit is not on the channel's branch, or if a stable tag is published as a pre-release. Mark dev releases as pre-releases so GitHub keeps showing the latest stable one as "Latest". Stable and dev images never share tags or build cache.
 
-Releasing: update `CHANGELOG.md` (rename `[Unreleased]` to the version and date), merge, then create the release in GitHub with a new tag on the right branch. After the first release, make the package public once in GitHub → Packages → `calico` → Package settings → Change visibility (new GHCR packages are private).
+Releasing: update `CHANGELOG.md` (rename `[Unreleased]` to the version, e.g. `## [0.2.0]`, no date), merge, then create the release in GitHub with a new tag on the right branch. After the first release, make the package public once in GitHub → Packages → `calico` → Package settings → Change visibility (new GHCR packages are private).
 
 ## Configuration (`.env`)
 

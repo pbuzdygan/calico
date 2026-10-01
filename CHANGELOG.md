@@ -2,29 +2,13 @@
 
 All notable changes to CALICO are listed here, newest first, described from the user's point of view: what you can do now that you couldn't before, and what works better.
 
-## [Unreleased]
+## [0.1.0]
+
+The first versioned release. Compared with the initial alpha (September 2026), CALICO has a new look, a guided plan that tells you whether your diet is working, your own data backup, an English version, ready-made server images and sign-in that is safe to put on the internet.
 
 ### New Features
 
-- **Ready-made images for your server.** CALICO is now published as a container image for regular PCs and servers (amd64) and for ARM devices such as a Raspberry Pi 4 or 5 (arm64). You no longer have to build it yourself: download the compose file, run one command, and upgrade later with `docker compose pull`. Choose a stable version, or the development channel if you want to try new things early.
-- **Sign in with your name instead of picking from a list.** The owner can hide the list of users on the login screen, so strangers can't see who has an account. Your device remembers the name you typed last – never your PIN.
-- **Know when someone tried to get in.** After you sign in, CALICO tells you how many failed attempts there were on your account since your last visit.
-
-### Improvements
-
-- **Much harder to guess your PIN.** New PINs have at least 6 digits and obvious ones like 123456 or 111111 are refused. If your PIN is shorter, CALICO asks you to set a new one right after you sign in. Changing your PIN now requires your current PIN, so someone who finds your phone unlocked can't take over your account.
-- **Nobody can lock you out.** Wrong PINs typed by someone else no longer lock your account for you: they lock out the person guessing, and the browsers you have signed in with before always keep working.
-- **A freshly installed CALICO can't be claimed by strangers.** Creating the first account needs a one-time code that only the person running the server can see in its logs.
-- **Safer to run on your network or the internet.** The server components were updated to fix known security issues. The app now refuses oversized requests, sends stricter browser security rules and reveals less about itself. The container runs with the minimum permissions it needs, so even a flaw in the app could not change its own files.
-- **Choose which user the app runs as.** Set `PUID` and `PGID` to your own user and group, and the app's data files get the same owner as the rest of your files – no more permission problems when you keep the data in a folder on your server.
-- **Clearer setup.** Every setting in the example configuration file is explained in plain words, with recommendations for instances reachable from the internet. Settings that did nothing have been removed.
-
-## [0.1.0] – 2026-10-01
-
-The first versioned release. Compared with the initial alpha (September 2026), CALICO has a new look, a guided plan that tells you whether your diet is working, your own data backup, and an English version.
-
-### New Features
-
+- **Ready-made images for your server.** CALICO is published as a container image for regular PCs and servers (amd64) and for ARM devices such as a Raspberry Pi 4 or 5 (arm64). You don't have to build it yourself: download the compose file, run one command, and upgrade later with `docker compose pull`. Choose a stable version, or the development channel if you want to try new things early.
 - **A completely new look.** A dark, phone-friendly design with a calorie ring that shows at a glance how much of today's target you've eaten. The app is organised into five sections: Today, Log, Progress, Goals and Settings. On a computer the menu moves to the side.
 - **Install it like an app.** Add CALICO to your phone's home screen and it opens full-screen with its own icon. It never needs an internet connection; everything, including fonts, comes from your own server.
 - **Add meals with a simple form.** No need to remember the text format anymore: pick the meal type and fill in calories and macros. Pasting text templates still works if you prefer it.
@@ -37,19 +21,24 @@ The first versioned release. Compared with the initial alpha (September 2026), C
 - **Bring your history with you.** If you've been dieting since before you started using CALICO, set the date your plan really began. Forecasts and charts then use your earlier weigh-ins, including imported ones.
 - **Export and import your data (your backup).** Download all your days as a simple spreadsheet file, one row per day. You can also download a blank template, fill it in with past data in Excel or another spreadsheet app, and import it. Days you've already logged are never overwritten. If the file has mistakes, nothing is imported and you get a list of the rows to fix.
 - **Polish and English.** Switch the language on the login screen or in Settings. Your choice is remembered on the device and on your account. Text templates and spreadsheet files work in both languages.
-- **Change your PIN** in Settings.
 - **Stay signed in.** Unlock once with your PIN and you stay signed in in that browser tab for 12 hours, even if your phone puts the browser to sleep. Use the Log out button in the menu when you're done.
+- **Sign in with your name instead of picking from a list.** The owner can hide the list of users on the login screen, so strangers can't see who has an account. Your device remembers the name you typed last – never your PIN.
+- **Know when someone tried to get in.** After you sign in, CALICO tells you how many failed attempts there were on your account since your last visit.
 
 ### Improvements
 
 - **Your profile comes first.** New users are guided through a short profile setup (sex, age, height, weight, activity and goal) before they start, so the calorie target is calculated from real data rather than placeholder values. A live preview shows your target and whether it's a deficit or a surplus before you save.
-- **Your own account from the start.** On first launch you create your own user and PIN. There is no shared default account with a guessable PIN anymore.
-- **Better protection against PIN guessing.** After 5 wrong PINs the account is locked for a few minutes, and the lock gets longer with every further series of wrong attempts. The message tells you how many attempts you have left.
-- **Control who can create accounts.** The owner can switch off new account creation so that nobody else on the home network can add users.
+- **Your own account from the start.** On first launch you create your own user and PIN – there is no shared default account with a guessable PIN anymore. Creating that first account needs a one-time code that only the person running the server can see in its logs, so strangers can't claim a freshly installed CALICO.
+- **Much harder to guess your PIN.** New PINs have at least 6 digits and obvious ones like 123456 or 111111 are refused. If your PIN is shorter, CALICO asks you to set a new one right after you sign in. You can change your PIN in Settings; it asks for your current PIN, so someone who finds your phone unlocked can't take over your account.
+- **Nobody can lock you out.** Wrong PINs typed by someone else don't lock your account for you: they lock out the person guessing, and the browsers you have signed in with before always keep working. The message after a wrong PIN tells you how many attempts you have left.
+- **Control who can create accounts.** The owner can switch off new account creation so that nobody else can add users.
 - **Changing your goal updates the days ahead too.** When your calorie target changes, today and any future days you've already planned follow the new target, while past days keep the target they had.
 - **Clearer feedback.** Every action shows a short confirmation or a clear error message wherever you are in the app, buttons can't be pressed twice by accident, and the app no longer flashes the lock screen when you reload the page.
 - **Proper Polish characters** everywhere (Śniadanie, Obwód pasa…), with correct grammar for repeated meals (Obiad Drugi, Kolacja Druga). You can still type templates without Polish characters.
-- **Simpler installation.** CALICO now runs as a single container, and existing data is upgraded automatically on first start.
+- **Simpler installation.** CALICO runs as a single container, and existing data is upgraded automatically on first start.
+- **Choose which user the app runs as.** Set `PUID` and `PGID` to your own user and group, and the app's data files get the same owner as the rest of your files – no permission problems when you keep the data in a folder on your server.
+- **Safer to run on your network or the internet.** The server components are up to date with known security fixes. The app refuses oversized requests, sends strict browser security rules and reveals little about itself. The container runs with the minimum permissions it needs, so even a flaw in the app could not change its own files.
+- **Clearer setup.** Every setting in the example configuration file is explained in plain words, with recommendations for instances reachable from the internet.
 
 ### Bug Fixes
 
