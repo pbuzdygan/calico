@@ -169,7 +169,7 @@ Every key is optional; `.env.example` explains each one in detail.
 | `ALLOW_SIGNUP` | `true` | `false` = new accounts can only be created on first launch (when no user exists); `POST /api/users` then returns `403`. Use `false` on any internet-facing instance |
 | `SHOW_USER_LIST` | `true` | `false` = the login screen asks for the user name instead of listing all users. Use `false` on any internet-facing instance |
 | `PIN_MIN_LENGTH` | `6` | minimum length of new PINs (4–8). Existing shorter PINs must be changed after the next sign-in |
-| `FORWARDED_ALLOW_IPS` | `127.0.0.1,::1` | addresses of reverse proxies trusted to report the client IP (`X-Forwarded-For`); IP addresses or networks, e.g. `172.16.0.0/12`. Required behind a proxy for per-client rate limiting |
+| `FORWARDED_ALLOW_IPS` | `127.0.0.1,::1` | only behind a reverse proxy: the address CALICO sees the proxy connecting from (shown at the start of each line in `docker compose logs calico`) – the Docker network's subnet for a proxy container (e.g. `172.18.0.0/16`), the network's gateway for a proxy on the host (e.g. `172.18.0.1`), or the proxy machine's IP. Needed for per-client rate limiting; see `.env.example` |
 | `SESSION_TTL_HOURS` | `12` | how long a session stays valid after a PIN unlock |
 | `SESSION_SECRET` | empty | session signing key; empty = generated automatically and stored in the database |
 | `CORS_ORIGIN` | empty | empty = no CORS (frontend and API on the same origin) |
@@ -255,7 +255,7 @@ CALICO works on a home network out of the box and can be exposed to the internet
 
 **If you host it on the internet**, put it behind a reverse proxy (Caddy, nginx, Traefik) with HTTPS and a valid certificate (and HSTS) – CALICO itself speaks plain HTTP. Then:
 
-1. set `FORWARDED_ALLOW_IPS` to the proxy's address or network (e.g. `172.16.0.0/12` for a proxy container on the Docker network). Without it every client appears to come from the proxy, so one attacker would block new sign-ins for everyone (trusted devices keep working). Never set it to `*` when the container port is reachable directly,
+1. set `FORWARDED_ALLOW_IPS` to the address CALICO sees the proxy connecting from – open the app through the proxy and read it from `docker compose logs calico` (details in `.env.example`). Without it every client appears to come from the proxy, so one attacker would block new sign-ins for everyone (trusted devices keep working). Never set it to `*` when the container port is reachable directly,
 2. create all accounts first, then set `ALLOW_SIGNUP=false` and `SHOW_USER_LIST=false`,
 3. publish the container port on localhost only (`"127.0.0.1:8380:8000"`) so the proxy is the only way in,
 4. optionally add request rate limiting at the proxy and an extra authentication layer (VPN such as WireGuard or Tailscale, Authelia, Authentik, Cloudflare Access) for defence in depth.
