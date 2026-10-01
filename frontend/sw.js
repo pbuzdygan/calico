@@ -1,10 +1,25 @@
 // Calico – service worker: powłoka aplikacji offline. Dane (/api) nigdy nie trafiają do cache.
-const CACHE = "calico-shell-v4";
+const CACHE = "calico-shell-v5";
 const SHELL = [
   "/",
   "/index.html",
   "/styles.css",
-  "/main.js",
+  "/js/api.js",
+  "/js/auth.js",
+  "/js/charts.js",
+  "/js/config.js",
+  "/js/entry-sheet.js",
+  "/js/main.js",
+  "/js/nav.js",
+  "/js/profile-form.js",
+  "/js/state.js",
+  "/js/ui.js",
+  "/js/util.js",
+  "/js/views/goals.js",
+  "/js/views/log.js",
+  "/js/views/more.js",
+  "/js/views/progress.js",
+  "/js/views/today.js",
   "/manifest.json",
   "/fonts/inter-latin.woff2",
   "/fonts/inter-latin-ext.woff2",
