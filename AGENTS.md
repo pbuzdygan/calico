@@ -32,12 +32,13 @@ Kluczowe decyzje produktowe (nie zmieniaj bez zgody właściciela):
 - wpisy maks. na jutro, nie wcześniej niż 2000-01-01 (D5),
 - tylko LAN (D6),
 - **D9: brak trybu administratora i logów diagnostycznych** – usunięte w całości; nie przywracaj bez zgody właściciela.
+- **D10: brak użytkownika i PIN-u domyślnego.** Pierwszy start = ekran „Utwórz użytkownika”; nie dodawaj bootstrapu konta ani `DEFAULT_USER_PIN`.
 
 ## Uruchamianie
 
 ```bash
 cp .env.example .env
-docker compose up --build -d      # http://localhost:8080, "Domyślny Użytkownik", PIN 1234
+docker compose up --build -d      # http://localhost:8080, pierwszy start: utwórz użytkownika (D10)
 docker compose logs calico --tail=100
 ```
 

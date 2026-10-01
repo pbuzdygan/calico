@@ -70,7 +70,12 @@
           <button id="unlockBtn" class="btn btn-primary" type="submit">Odblokuj</button>
           <p id="authStatus" class="form-status" aria-live="polite"></p>
         </form>
-        <div class="lock-links">
+        <!-- Pierwszy start (D10): brak użytkownika domyślnego, pierwszy zakładany jawnie -->
+        <div id="firstRun" class="lock-form" hidden>
+          <p class="hint">Witaj w CALICO. Utwórz pierwszego użytkownika – wybierz nazwę i PIN, którym będziesz odblokowywać aplikację.</p>
+          <button id="firstRunBtn" class="btn btn-primary" type="button"><svg class="icon"><use href="#i-user" /></svg>Utwórz użytkownika</button>
+        </div>
+        <div id="lockLinks" class="lock-links">
           <button id="newUserBtn" class="btn btn-quiet" type="button"><svg class="icon"><use href="#i-user" /></svg>Nowy użytkownik</button>
         </div>
       </div>

@@ -39,7 +39,7 @@ docker run --rm -v "$PWD:/repo" -w /repo python:3.12-slim \
 
 ## Najważniejsze reguły
 
-- **Profil jest obowiązkowy i nie ma wartości domyślnych.** Nowy użytkownik (także „Domyślny Użytkownik” tworzony przy instalacji) po pierwszym odblokowaniu PIN-em musi uzupełnić profil: płeć, wiek, wzrost, aktualną wagę, aktywność, cel i korektę celu. Okna nie da się zamknąć ani pominąć, można jedynie zmienić użytkownika. Do tego czasu API danych zwraca `428`.
+- **Profil jest obowiązkowy i nie ma wartości domyślnych.** Nowy użytkownik po pierwszym odblokowaniu PIN-em musi uzupełnić profil: płeć, wiek, wzrost, aktualną wagę, aktywność, cel i korektę celu. Okna nie da się zamknąć ani pominąć, można jedynie zmienić użytkownika. Do tego czasu API danych zwraca `428`.
 
 - „Dzisiaj” liczone jest w strefie `APP_TIMEZONE` (domyślnie `Europe/Warsaw`).
 - Data wpisu: od `2000-01-01` do jutra włącznie.
@@ -48,7 +48,7 @@ docker run --rm -v "$PWD:/repo" -w /repo python:3.12-slim \
 - `Bilans dnia` zastępuje sumę posiłków z tego dnia.
 - Cel kcal to **plan**, a nie wynik wzoru po każdym ważeniu. Zmienia się tylko jawnie:
   - zapis profilu = nowy plan liczony wzorem z „wagi planu” (zapis ze zmienioną wagą tworzy też dzisiejszy wpis `Waga`),
-  - akceptacja sugestii z karty „Ocena planu” (zakładka `Użytkownik`).
+  - akceptacja sugestii z karty „Ocena planu” (zakładka `Cele`).
 - Wpisy `Waga` służą do monitorowania: profil pokazuje aktualną wagę obok wagi planu, ale cel się nie zmienia.
 - Ocena planu (`app/plan.py`): trend masy z regresji pomiarów od startu planu (min. 4 pomiary z 14 dni), porównany z tempem wynikającym z planu. W zakresie → cel bez zmian, nawet jeśli szacowane TDEE spadło. Poza zakresem → przez pierwsze 21 dni „obserwuj”, potem sugestia korekty o 100–200 kcal (nie poniżej 1500 kcal dla mężczyzn / 1200 kcal dla kobiet). Gdy wpisy jedzenia pokrywają ≥ 70% dni, TDEE jest szacowane także z faktycznego spożycia i zmiany masy.
 - Zmiana celu aktualizuje cel dnia dzisiejszego i przyszłych; przeszłe dni zachowują swój cel.
@@ -95,7 +95,9 @@ cp .env.example .env
 docker compose up --build -d
 ```
 
-Otwórz `http://localhost:8080`. Przy pierwszym starcie: użytkownik `Domyślny Użytkownik`, PIN z `DEFAULT_USER_PIN` (domyślnie `1234`). Po odblokowaniu aplikacja wymusi uzupełnienie profilu. PIN zmień w zakładce `Użytkownik`.
+Otwórz `http://localhost:8080`. Przy pierwszym starcie nie ma żadnego użytkownika ani PIN-u domyślnego – aplikacja prosi o utworzenie pierwszego użytkownika (nazwa i PIN), a potem wymusza uzupełnienie profilu. PIN można zmienić w zakładce `Więcej`.
+
+Istniejące instalacje zachowują swoich użytkowników (także dawnego „Domyślnego Użytkownika” – można go usunąć po założeniu własnego konta). Klucz `DEFAULT_USER_PIN` w `.env` jest ignorowany i można go usunąć.
 
 Aplikacja działa w jednym kontenerze: FastAPI serwuje API i pliki frontendu. Dane są w wolumenie `calico_data` (`/data/calico.db`).
 
@@ -114,7 +116,6 @@ Wolumen z danymi zostaje ten sam. Przy pierwszym starcie baza jest migrowana aut
 | `APP_TIMEZONE` | `Europe/Warsaw` | strefa, w której liczony jest „dzisiejszy” dzień |
 | `SQLITE_PATH` | `/data/calico.db` | ścieżka bazy |
 | `CORS_ORIGIN` | pusty | pusty = brak CORS (frontend i API na tym samym adresie) |
-| `DEFAULT_USER_PIN` | `1234` | PIN użytkownika tworzonego przy pierwszym starcie |
 | `SESSION_TTL_HOURS` | `12` | jak długo ważna jest sesja po odblokowaniu PIN-em |
 | `SESSION_SECRET` | pusty | klucz podpisu sesji; pusty = generowany automatycznie i zapisany w bazie |
 
@@ -124,7 +125,7 @@ Wszystkie endpointy danych wymagają parametru `user_id` (query albo ścieżka) 
 
 Użytkownicy i profil:
 
-- `GET /api/users`, `POST /api/users`, `DELETE /api/users/{user_id}`
+- `GET /api/users` (pusta lista = pierwszy start), `POST /api/users` — `{"display_name": "Ala", "pin": "2468"}`, `DELETE /api/users/{user_id}`
 - `POST /api/users/{user_id}/pin` — `{"new_pin": "5678"}`; unieważnia stare tokeny i zwraca nowy
 - `POST /api/auth/verify` — `{"user_id": 1, "pin": "1234"}` → `{"ok": true, "token": "…", "expires_at": "…"}`
 - `GET|PUT /api/profile/{user_id}` — `is_complete=false` i puste pola, dopóki profil nie zostanie zapisany; `PUT` wymaga wszystkich pól. `weight_kg` to waga planu, `current_weight_kg` to ostatni pomiar

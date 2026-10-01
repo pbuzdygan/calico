@@ -13,6 +13,11 @@ PROFILE = {
 }
 
 
+def test_fresh_install_has_no_users(client):
+    """D10: brak uzytkownika domyslnego i PIN-u domyslnego - pierwszy start wymaga utworzenia uzytkownika."""
+    assert client.get("/api/users").json() == []
+
+
 def test_new_install_user_has_no_default_profile(fresh_api):
     profile = fresh_api.profile()
     assert profile["is_complete"] is False

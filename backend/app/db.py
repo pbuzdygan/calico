@@ -3,7 +3,6 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 from .config import settings
-from .security import hash_pin
 
 DATABASE_URL = f"sqlite:///{settings.sqlite_path}"
 
@@ -29,14 +28,9 @@ def _columns(conn: Connection, table: str) -> list[str]:
 
 def _legacy_column_upgrades(conn: Connection) -> None:
     """Kolumny dodane przed wprowadzeniem wersjonowania schematu."""
+    # Najstarsza wspierana baza (884cafa) ma juz PIN-y; brak PIN-u domyslnego do uzupelniania (D10).
     if "pin_hash" not in _columns(conn, "users"):
         conn.execute(text("ALTER TABLE users ADD COLUMN pin_hash VARCHAR(256)"))
-    missing_pin_users = conn.execute(text("SELECT id FROM users WHERE pin_hash IS NULL OR pin_hash = ''")).fetchall()
-    for row in missing_pin_users:
-        conn.execute(
-            text("UPDATE users SET pin_hash = :pin_hash WHERE id = :id"),
-            {"pin_hash": hash_pin(settings.default_user_pin), "id": row.id},
-        )
 
     day_log_columns = _columns(conn, "day_logs")
     for column, ddl in (
@@ -47,30 +41,6 @@ def _legacy_column_upgrades(conn: Connection) -> None:
     ):
         if column not in day_log_columns:
             conn.execute(text(f"ALTER TABLE day_logs ADD COLUMN {column} {ddl}"))
-
-
-def _bootstrap_default_user(conn: Connection) -> None:
-    bootstrap_done = conn.execute(text("SELECT value FROM app_meta WHERE key = 'default_user_bootstrapped'")).scalar()
-    users_count = conn.execute(text("SELECT COUNT(*) FROM users")).scalar() or 0
-    if bootstrap_done or users_count:
-        return
-    created_at = conn.execute(text("SELECT CURRENT_TIMESTAMP")).scalar()
-    conn.execute(
-        text(
-            """
-            INSERT INTO users (slug, display_name, pin_hash, is_active, created_at)
-            VALUES (:slug, :display_name, :pin_hash, :is_active, :created_at)
-            """
-        ),
-        {
-            "slug": "domyslny-uzytkownik",
-            "display_name": "Domyślny Użytkownik",
-            "pin_hash": hash_pin(settings.default_user_pin),
-            "is_active": True,
-            "created_at": created_at,
-        },
-    )
-    conn.execute(text("INSERT INTO app_meta (key, value) VALUES ('default_user_bootstrapped', '1')"))
 
 
 def _migration_1_drop_day_status(db: Session) -> None:
@@ -170,7 +140,6 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     with engine.begin() as conn:
         _legacy_column_upgrades(conn)
-        _bootstrap_default_user(conn)
     _run_migrations()
 
 

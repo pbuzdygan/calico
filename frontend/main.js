@@ -368,13 +368,12 @@ function lockUser(message = "") {
 async function loadUsers(selectId = null) {
   const users = await fetchJSON(`${API_BASE}/users`);
   el.userSelect.innerHTML = "";
-  if (!users.length) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = "Brak użytkowników – utwórz nowego";
-    el.userSelect.appendChild(option);
+  const firstRun = !users.length;
+  el.firstRun.hidden = !firstRun;
+  el.unlockForm.hidden = firstRun;
+  el.lockLinks.hidden = firstRun;
+  if (firstRun) {
     state.userId = null;
-    el.authStatus.textContent = "Utwórz pierwszego użytkownika.";
     return;
   }
   users.forEach((user) => {
@@ -1605,12 +1604,15 @@ el.userSelect.addEventListener("change", () => {
   el.pinInput.focus();
 });
 
-el.newUserBtn.addEventListener("click", () => {
+function openNewUserDialog() {
   el.userDialogForm.reset();
   el.userDialogError.textContent = "";
   openSheet(el.userDialog);
   el.newUserName.focus();
-});
+}
+
+el.newUserBtn.addEventListener("click", openNewUserDialog);
+el.firstRunBtn.addEventListener("click", openNewUserDialog);
 
 el.userDialogForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -1675,7 +1677,7 @@ async function init() {
     }
   }
   showScreen("lock");
-  el.pinInput.focus();
+  (state.userId ? el.pinInput : el.firstRunBtn).focus();
   registerServiceWorker();
 }
 

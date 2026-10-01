@@ -5,7 +5,6 @@ from datetime import UTC, datetime
 _TMP_DIR = tempfile.mkdtemp(prefix="calico-tests-")
 os.environ["SQLITE_PATH"] = os.path.join(_TMP_DIR, "test.db")
 os.environ["APP_TIMEZONE"] = "Europe/Warsaw"
-os.environ["DEFAULT_USER_PIN"] = "1234"
 os.environ["FRONTEND_DIR"] = os.path.join(_TMP_DIR, "no-frontend")
 
 import pytest  # noqa: E402
@@ -36,7 +35,10 @@ def client():
 
 @pytest.fixture
 def uid(client):
-    return client.get("/api/users").json()[0]["id"]
+    # D10: brak uzytkownika domyslnego - pierwszy uzytkownik zakladany jawnie
+    response = client.post("/api/users", json={"display_name": "Test", "pin": "1234"})
+    assert response.status_code == 200, response.text
+    return response.json()["id"]
 
 
 class Api:
