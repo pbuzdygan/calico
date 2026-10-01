@@ -24,6 +24,8 @@ from .schemas import (
     EntryDuplicateIn,
     EntryMoveIn,
     EntryUpdateIn,
+    ImportIn,
+    ImportResultOut,
     MacroTargetsIn,
     TargetWeightIn,
     PlanApplyIn,
@@ -403,15 +405,27 @@ def api_reports_month(month: str, user: User = Depends(profiled_user), db: Sessi
     return services.report_for_range(db, user_id=user.id, date_from=date_from, date_to=date_to)
 
 
-@app.get("/api/export")
-def api_export(user: User = Depends(profiled_user), db: Session = Depends(get_db)):
-    content = "﻿" + services.export_entries_csv(db, user.id)
-    file_name = f"calico-{user.slug}-{clock.today().isoformat()}.csv"
+def _csv_download(content: str, file_name: str) -> Response:
     return Response(
         content=content,
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
     )
+
+
+@app.get("/api/export")
+def api_export(user: User = Depends(profiled_user), db: Session = Depends(get_db)):
+    return _csv_download(services.export_days_csv(db, user.id), f"calico-{user.slug}-{clock.today().isoformat()}.csv")
+
+
+@app.get("/api/import/template")
+def api_import_template(user: User = Depends(profiled_user)):
+    return _csv_download(services.import_template_csv(), "calico-szablon-importu.csv")
+
+
+@app.post("/api/import", response_model=ImportResultOut)
+def api_import(payload: ImportIn, user: User = Depends(profiled_user), db: Session = Depends(get_db)):
+    return services.import_days_csv(db, user.id, payload.content)
 
 
 # --- czat -----------------------------------------------------------------------------

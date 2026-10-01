@@ -45,6 +45,8 @@
       <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></symbol>
       <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" /></symbol>
       <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4M7 9l5-5 5 5M5 20h14" /></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></symbol>
       <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4" /><path d="M11 12l8.5-8.5M16 7l3 3" /></symbol>
       <symbol id="i-logout" viewBox="0 0 24 24"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" /><path d="M9 16l-4-4 4-4M5 12h11" /></symbol>
       <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></symbol>
@@ -430,9 +432,16 @@
                 </form>
               </article>
               <article class="card">
-                <div class="card-head"><h2 class="card-title"><svg class="icon"><use href="#i-download" /></svg>Eksport danych</h2></div>
-                <p class="card-sub">Wszystkie wpisy w pliku CSV (Excel, arkusze Google).</p>
-                <button id="exportBtn" class="btn btn-quiet btn-block" type="button">Pobierz CSV</button>
+                <div class="card-head"><h2 class="card-title"><svg class="icon"><use href="#i-download" /></svg>Eksport i import</h2></div>
+                <p class="card-sub">Prosty formularz CSV (Excel, Arkusze Google): jeden wiersz na dzień – data, waga, obwód pasa, kalorie i makro. Eksport ma ten sam układ co szablon.</p>
+                <div class="button-col">
+                  <button id="exportBtn" class="btn btn-quiet btn-block" type="button"><svg class="icon"><use href="#i-download" /></svg>Eksportuj dane</button>
+                  <button id="templateBtn" class="btn btn-quiet btn-block" type="button"><svg class="icon"><use href="#i-file" /></svg>Pobierz pusty szablon</button>
+                  <button id="importBtn" class="btn btn-quiet btn-block" type="button"><svg class="icon"><use href="#i-upload" /></svg>Importuj plik CSV</button>
+                  <input id="importFile" type="file" accept=".csv,text/csv" hidden />
+                </div>
+                <p class="hint">Import dodaje tylko dni bez wpisów – dni, które mają już dane, są pomijane. Kalorie i makro trafiają jako „Bilans dnia”. Przy błędach w pliku nic nie jest zapisywane.</p>
+                <div id="importResult" class="import-result" aria-live="polite"></div>
               </article>
               <article class="card">
                 <div class="card-head"><h2 class="card-title"><svg class="icon"><use href="#i-user" /></svg>Konto</h2></div>

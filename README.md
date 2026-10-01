@@ -11,7 +11,7 @@ CALICO to prosty dziennik kalorii, makroskładników, wagi i obwodu pasa. Wpisy 
 - liczy sumę kcal i makro dnia oraz cel kcal (Mifflin-St Jeor × aktywność × korekta celu),
 - `Dziennik`: edycja, duplikowanie, przenoszenie i usuwanie pozycji, cofanie ostatniej zmiany, czyszczenie dnia,
 - `Raporty`: 7/30/90 dni, miesiąc, dowolny zakres — kalorie vs cel, bilans, najwyższy dzień, trend wagi (średnia 7-dniowa),
-- eksport wszystkich wpisów do CSV.
+- eksport i import danych w prostym formularzu CSV „wiersz = dzień” (pusty szablon do pobrania z aplikacji).
 
 ## Interfejs
 
@@ -21,7 +21,7 @@ Mobile-first, ciemny motyw zgodny z brandingiem (`docs/UI design.md`): granatowe
 - **Dziennik** – kalendarz miesięczny (kropka = dzień z wpisami: turkusowa – jedzenie, niebieska – tylko pomiary; klik wybiera dzień) oraz posiłki pogrupowane (Śniadanie, Obiad, Kolacja, Przekąski, Bilans dnia, Pomiary); dotknięcie pozycji otwiera akcje: edytuj, duplikuj, przenieś, usuń.
 - **Postępy** – 1M/3M/6M/1R/Wszystko/Własny: wykres wagi (z trendem 7 dni), obwodu, kalorii na tle celu, regularność tygodnia, historia dni.
 - **Cele** – aktualny plan, waga planu vs średnia, ocena planu i akceptacja sugestii.
-- **Więcej** – profil i plan, zmiana PIN-u, eksport CSV, konto.
+- **Więcej** – profil i plan, zmiana PIN-u, eksport/import CSV, konto.
 
 Nawigacja (Dziś, Postępy, Cele, Dziennik, Więcej): dolny pasek na telefonie, boczny panel od 960 px. Dodawanie i edycja w dolnych panelach. Font Inter (OFL) jest dołączony lokalnie (`frontend/fonts/`) – aplikacja nie pobiera nic z internetu.
 
@@ -157,7 +157,9 @@ Raporty i eksport:
 - `GET /api/reports/summary?user_id=&days=7`
 - `GET /api/reports/range?user_id=&date_from=&date_to=` (maks. 3660 dni)
 - `GET /api/reports/month?user_id=&month=RRRR-MM`
-- `GET /api/export?user_id=` — CSV
+- `GET /api/export?user_id=` — CSV „wiersz = dzień”: `Data;Waga (kg);Obwód pasa (cm);Kalorie (kcal);Białko (g);Węglowodany (g);Tłuszcze (g)` (średnik, UTF-8 z BOM, przecinek dziesiętny; posiłki zsumowane do dnia)
+- `GET /api/import/template?user_id=` — pusty szablon w tym samym formacie (wiersze zaczynające się od `#` są pomijane)
+- `POST /api/import?user_id=` — `{"content": "<tekst CSV>"}` → `{"imported_days", "imported_entries", "skipped_dates", "errors": [{"row", "message"}], "error_count"}`. Najpierw walidowany jest cały plik – przy błędach nic nie jest zapisywane. Dni z istniejącymi wpisami są pomijane. Kalorie i makro → „Bilans dnia” (makro opcjonalne), waga i obwód → osobne wpisy. Akceptuje też przecinek/tabulator jako separator, nagłówki bez polskich znaków i w dowolnej kolejności oraz daty `DD.MM.RRRR`
 
 Czat tekstowy: `POST /api/chat/message` — odpowiedź ma pole `kind`: `saved`, `info` albo `error`.
 

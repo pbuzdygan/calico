@@ -1327,21 +1327,65 @@ el.pinChangeForm.addEventListener("submit", async (event) => {
   }
 });
 
-el.exportBtn.addEventListener("click", () =>
-  withBusy(el.exportBtn, async () => {
-    const response = await fetch(`${API_BASE}/export?user_id=${state.userId}`, { headers: userHeaders() });
-    if (!response.ok) throw new Error(`Eksport nie powiódł się (${response.status}).`);
-    const blob = await response.blob();
-    const match = /filename="([^"]+)"/.exec(response.headers.get("Content-Disposition") || "");
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = match ? match[1] : "calico.csv";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-  }).catch(toastError)
+// --- eksport / import "wiersz = dzień" (D11) ---------------------------------------------------------
+
+const IMPORT_MAX_BYTES = 1_000_000;
+
+async function downloadCsv(path, fallbackName) {
+  const response = await fetch(`${API_BASE}${path}?user_id=${state.userId}`, { headers: userHeaders() });
+  if (!response.ok) throw new Error(`Pobieranie nie powiodło się (${response.status}).`);
+  const blob = await response.blob();
+  const match = /filename="([^"]+)"/.exec(response.headers.get("Content-Disposition") || "");
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = match ? match[1] : fallbackName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+function renderImportResult(result) {
+  if (result.error_count) {
+    const more = result.error_count > result.errors.length ? `<li>… i ${result.error_count - result.errors.length} więcej</li>` : "";
+    el.importResult.innerHTML = `<p class="form-status error">Nic nie zaimportowano – popraw ${result.error_count} ${plural(result.error_count, "wiersz", "wiersze", "wierszy")} i spróbuj ponownie.</p>
+      <ul class="notes">${result.errors.map((error) => `<li>Wiersz ${error.row}: ${escapeHtml(error.message)}</li>`).join("")}${more}</ul>`;
+    return;
+  }
+  const parts = [`Zaimportowano ${result.imported_days} ${plural(result.imported_days, "dzień", "dni", "dni")} (${result.imported_entries} ${plural(result.imported_entries, "wpis", "wpisy", "wpisów")}).`];
+  if (result.skipped_dates.length) {
+    parts.push(`Pominięto ${result.skipped_dates.length} ${plural(result.skipped_dates.length, "dzień", "dni", "dni")} z istniejącymi wpisami: ${result.skipped_dates.map(formatDayLabel).join(", ")}.`);
+  }
+  el.importResult.innerHTML = `<p class="form-status success">${escapeHtml(parts.join(" "))}</p>`;
+  toast(parts[0], "success");
+}
+
+el.exportBtn.addEventListener("click", () => withBusy(el.exportBtn, () => downloadCsv("/export", "calico.csv")).catch(toastError));
+
+el.templateBtn.addEventListener("click", () =>
+  withBusy(el.templateBtn, () => downloadCsv("/import/template", "calico-szablon-importu.csv")).catch(toastError)
 );
+
+el.importBtn.addEventListener("click", () => {
+  el.importFile.value = "";
+  el.importFile.click();
+});
+
+el.importFile.addEventListener("change", () => {
+  const file = el.importFile.files[0];
+  if (!file) return;
+  el.importResult.innerHTML = "";
+  if (file.size > IMPORT_MAX_BYTES) {
+    el.importResult.innerHTML = `<p class="form-status error">Plik jest za duży (maks. 1 MB).</p>`;
+    return;
+  }
+  withBusy(el.importBtn, async () => {
+    const content = await file.text();
+    renderImportResult(await api("/import", { method: "POST", body: { content } }));
+  }).catch((error) => {
+    el.importResult.innerHTML = `<p class="form-status error">${escapeHtml(error.message)}</p>`;
+  });
+});
 
 el.logoutBtn.addEventListener("click", () => {
   location.hash = "";

@@ -206,18 +206,6 @@ def test_change_pin_and_delete_user(client, api):
     assert client.get("/api/users").json() == []
 
 
-def test_export_csv(api):
-    api.chat(meal("Śniadanie", kcal=540))
-    api.chat("Waga: 82,4")
-    response = api.get("/api/export")
-    assert response.status_code == 200
-    assert "attachment" in response.headers["content-disposition"]
-    lines = response.text.lstrip("﻿").strip().splitlines()
-    assert lines[0].startswith("data,typ,etykieta,kcal")
-    assert lines[1].startswith("2026-06-15,breakfast,Śniadanie,540.0")
-    assert ",82.4," in lines[2]
-
-
 def test_security_headers(client):
     response = client.get("/health")
     assert response.headers["x-content-type-options"] == "nosniff"

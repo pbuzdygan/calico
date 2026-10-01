@@ -178,6 +178,27 @@ class DaySummaryOut(DayTotalsOut):
     pass
 
 
+class ImportIn(BaseModel):
+    """Zawartosc pliku CSV (frontend czyta plik lokalnie i wysyla tekst)."""
+
+    content: str = Field(max_length=1_000_000)
+
+
+class ImportRowErrorOut(BaseModel):
+    row: int
+    message: str
+
+
+class ImportResultOut(BaseModel):
+    """Przy bledach w wierszach nic nie jest importowane (imported_days=0)."""
+
+    imported_days: int = 0
+    imported_entries: int = 0
+    skipped_dates: list[date] = Field(default_factory=list)
+    errors: list[ImportRowErrorOut] = Field(default_factory=list)
+    error_count: int = 0
+
+
 class EntryValuesIn(BaseModel):
     """Strukturalny wpis z formularza. Zakresy sprawdza warstwa domenowa (wspolne z parserem tekstu)."""
 

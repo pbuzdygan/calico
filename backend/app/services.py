@@ -18,6 +18,8 @@ from .schemas import (
     DayEntryOut,
     DayTotalsOut,
     EntryValuesIn,
+    ImportResultOut,
+    ImportRowErrorOut,
     MacroTargetsIn,
     MacroTargetsOut,
     ProfileIn,
@@ -973,27 +975,193 @@ def parse_month_to_range(month_value: str) -> tuple[date, date]:
 # --- eksport --------------------------------------------------------------------
 
 
-def export_entries_csv(db: Session, user_id: int) -> str:
-    rows = db.execute(
-        select(DayLog.log_date, DayLog.daily_kcal_target_snapshot, DayEntry)
-        .join(DayEntry, DayEntry.day_log_id == DayLog.id)
-        .where(DayLog.user_id == user_id)
-        .order_by(DayLog.log_date.asc(), DayEntry.entry_order.asc(), DayEntry.id.asc())
-    ).all()
+# --- eksport / import "wiersz = dzien" (D11) -----------------------------------------------------------
+
+# Jeden format dla szablonu, eksportu i importu: srednik (Excel PL), UTF-8 z BOM, przecinek dziesietny.
+IO_COLUMNS = (
+    ("log_date", "Data"),
+    ("weight_kg", "Waga (kg)"),
+    ("waist_cm", "Obwód pasa (cm)"),
+    ("kcal", "Kalorie (kcal)"),
+    ("protein_g", "Białko (g)"),
+    ("carbs_g", "Węglowodany (g)"),
+    ("fat_g", "Tłuszcze (g)"),
+)
+# Naglowki po _normalize_text i bez jednostek w nawiasach.
+IO_HEADER_ALIASES = {
+    "data": "log_date",
+    "dzien": "log_date",
+    "waga": "weight_kg",
+    "obwod pasa": "waist_cm",
+    "obwod": "waist_cm",
+    "kalorie": "kcal",
+    "kcal": "kcal",
+    "ilosc kalorii": "kcal",
+    "bialko": "protein_g",
+    "weglowodany": "carbs_g",
+    "wegle": "carbs_g",
+    "tluszcze": "fat_g",
+    "tluszcz": "fat_g",
+}
+IO_DELIMITER = ";"
+IO_COMMENT = "#"
+IO_FOOD_FIELDS = ("kcal", "protein_g", "carbs_g", "fat_g")
+IMPORT_MAX_ROWS = 5000
+IMPORT_MAX_ERRORS_SHOWN = 50
+
+
+def _csv_document(rows: list[list[str]]) -> str:
     buffer = io.StringIO()
-    writer = csv.writer(buffer)
-    writer.writerow(["data", "typ", "etykieta", "kcal", "weglowodany_g", "tluszcze_g", "bialko_g", "waga_kg", "obwod_pasa_cm", "cel_kcal_dnia"])
-    for log_date, target, entry in rows:
-        writer.writerow(
-            [
-                log_date.isoformat(),
-                entry.entry_type,
-                entry.entry_label,
-                *("" if getattr(entry, field) is None else getattr(entry, field) for field in VALUE_FIELDS),
-                target,
-            ]
-        )
-    return buffer.getvalue()
+    csv.writer(buffer, delimiter=IO_DELIMITER, lineterminator="\r\n").writerows(rows)
+    return "\ufeff" + buffer.getvalue()
+
+
+def _io_number(value: float | None, decimals: int) -> str:
+    return "" if value is None else fmt_number(value, decimals)
+
+
+def import_template_csv() -> str:
+    """Pusty formularz do wypelnienia; wiersze zaczynajace sie od # sa pomijane przy imporcie."""
+    return _csv_document(
+        [
+            [label for _, label in IO_COLUMNS],
+            ["# Przykład – jeden wiersz na dzień, puste komórki są pomijane. Wiersze zaczynające się od # są ignorowane.", "", "", "", "", "", ""],
+            ["# 2026-09-01", "91,2", "", "2150", "140", "210", "70"],
+            ["# 2026-09-02", "", "102", "1980", "", "", ""],
+        ]
+    )
+
+
+def export_days_csv(db: Session, user_id: int) -> str:
+    """Wiersz = dzien: waga, obwod i sumy jedzenia dnia (posilki zsumowane, bilans dnia jak w karcie dnia)."""
+    day_logs = db.scalars(
+        select(DayLog).where(DayLog.user_id == user_id).options(selectinload(DayLog.entries)).order_by(DayLog.log_date.asc())
+    ).all()
+    rows = [[label for _, label in IO_COLUMNS]]
+    for day_log in day_logs:
+        if not day_log.entries:
+            continue
+        single = {entry.entry_type: entry for entry in day_log.entries if entry.entry_type in MEASUREMENT_FIELDS}
+        weight = single.get("weight")
+        waist = single.get("waist")
+        row = [
+            day_log.log_date.isoformat(),
+            _io_number(weight.weight_kg if weight else None, 2),
+            _io_number(waist.waist_cm if waist else None, 1),
+        ]
+        balance = [entry for entry in day_log.entries if entry.entry_type == "daily_balance"]
+        sources = balance or [entry for entry in day_log.entries if entry.entry_type in MEAL_ENTRY_TYPES]
+        totals = {"kcal": day_log.total_kcal, "protein_g": day_log.total_protein_g, "carbs_g": day_log.total_carbs_g, "fat_g": day_log.total_fat_g}
+        for field in IO_FOOD_FIELDS:
+            # Pole puste we wszystkich zrodlach (np. import samych kalorii) zostaje puste, a nie 0.
+            known = any(getattr(entry, field) is not None for entry in sources)
+            row.append(_io_number(totals[field], 1) if known else "")
+        rows.append(row)
+    return _csv_document(rows)
+
+
+def _io_header_key(raw: str) -> str | None:
+    name = _normalize_text(re.sub(r"\(.*?\)", "", raw))
+    return IO_HEADER_ALIASES.get(name)
+
+
+def _io_rows(content: str) -> list[list[str]]:
+    text = content.lstrip("\ufeff")
+    first_line = next((line for line in text.splitlines() if line.strip()), "")
+    if not first_line:
+        raise InputError("Plik jest pusty.")
+    try:
+        delimiter = csv.Sniffer().sniff(first_line, delimiters=";,\t").delimiter
+    except csv.Error:
+        delimiter = IO_DELIMITER
+    return [[cell.strip() for cell in row] for row in csv.reader(io.StringIO(text), delimiter=delimiter)]
+
+
+def _io_columns(header: list[str]) -> dict[str, int]:
+    columns: dict[str, int] = {}
+    for index, name in enumerate(header):
+        if not name:
+            continue
+        key = _io_header_key(name)
+        if key is None:
+            expected = ", ".join(label for _, label in IO_COLUMNS)
+            raise InputError(f"Nieznana kolumna „{name}”. Dozwolone kolumny: {expected}. Pobierz szablon z aplikacji.")
+        if key in columns:
+            raise InputError(f"Kolumna „{name}” występuje w pliku więcej niż raz.")
+        columns[key] = index
+    if "log_date" not in columns:
+        raise InputError("Brak kolumny „Data”. Pobierz szablon z aplikacji.")
+    return columns
+
+
+def _io_parse_row(values: dict[str, str]) -> tuple[date, list[ParsedEntryInput]]:
+    if not values.get("log_date"):
+        raise InputError("Brak daty.")
+    log_date = parse_date_value(values["log_date"])
+    validate_log_date(log_date)
+    numbers = {}
+    for field in VALUE_FIELDS:
+        raw = values.get(field, "").replace("\u00a0", "").replace(" ", "")
+        if raw:
+            numbers[field] = _parse_number(raw, field)
+    if any(field in numbers for field in IO_FOOD_FIELDS) and "kcal" not in numbers:
+        raise InputError("Podano makroskładniki bez kalorii – uzupełnij kolumnę „Kalorie”.")
+    entries = []
+    for entry_type, field in MEASUREMENT_FIELDS.items():
+        if field in numbers:
+            entries.append(ParsedEntryInput(entry_type=entry_type, log_date=log_date, **{field: numbers[field]}))
+    if "kcal" in numbers:
+        food = {field: numbers.get(field) for field in IO_FOOD_FIELDS}
+        entries.append(ParsedEntryInput(entry_type="daily_balance", log_date=log_date, **food))
+    for entry in entries:
+        validate_entry_input(entry)
+    return log_date, entries
+
+
+def import_days_csv(db: Session, user_id: int, content: str) -> ImportResultOut:
+    """Import "wiersz = dzien" (D11). Najpierw walidacja calego pliku - przy bledach nic nie jest zapisywane.
+
+    Dni, ktore maja juz wpisy, sa pomijane (ponowny import tego samego pliku niczego nie dubluje).
+    Kalorie i makro trafiaja jako "Bilans dnia", waga i obwod jako osobne wpisy. Cel kcal bez zmian (D2b).
+    """
+    rows = _io_rows(content)
+    data_rows = [(number, row) for number, row in enumerate(rows, start=1) if any(row) and not row[0].startswith(IO_COMMENT)]
+    if not data_rows:
+        raise InputError("Plik jest pusty.")
+    (_, header), *data_rows = data_rows
+    columns = _io_columns(header)
+    if len(data_rows) > IMPORT_MAX_ROWS:
+        raise InputError(f"Za dużo wierszy ({len(data_rows)}). Maksymalnie {IMPORT_MAX_ROWS} w jednym pliku.")
+
+    parsed: list[tuple[date, list[ParsedEntryInput]]] = []
+    errors: list[ImportRowErrorOut] = []
+    seen: dict[date, int] = {}
+    for number, row in data_rows:
+        values = {key: row[index] if index < len(row) else "" for key, index in columns.items()}
+        try:
+            log_date, entries = _io_parse_row(values)
+            if not entries:
+                continue
+            if log_date in seen:
+                raise InputError(f"Dzień {fmt_date(log_date)} występuje w pliku więcej niż raz (wiersz {seen[log_date]}).")
+            seen[log_date] = number
+            parsed.append((log_date, entries))
+        except InputError as exc:
+            errors.append(ImportRowErrorOut(row=number, message=str(exc)))
+    if errors:
+        return ImportResultOut(errors=errors[:IMPORT_MAX_ERRORS_SHOWN], error_count=len(errors))
+
+    result = ImportResultOut()
+    for log_date, entries in parsed:
+        existing = get_day_log(db, user_id, log_date)
+        if existing is not None and existing.entries:
+            result.skipped_dates.append(log_date)
+            continue
+        for entry in entries:
+            create_entry(db, user_id, entry)  # konczy sie refresh_day
+        result.imported_days += 1
+        result.imported_entries += len(entries)
+    return result
 
 
 # --- czat -------------------------------------------------------------------------
