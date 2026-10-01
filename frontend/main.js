@@ -27,9 +27,9 @@ const FIELD_LABELS = {
 };
 
 const MACROS = [
-  { field: "total_protein_g", label: "Białko", kcalPerGram: 4, cls: "protein" },
-  { field: "total_carbs_g", label: "Węglowodany", kcalPerGram: 4, cls: "carbs" },
-  { field: "total_fat_g", label: "Tłuszcze", kcalPerGram: 9, cls: "fat" },
+  { field: "total_protein_g", targetField: "target_protein_g", key: "protein_g", label: "Białko", kcalPerGram: 4, cls: "protein", max: 500 },
+  { field: "total_carbs_g", targetField: "target_carbs_g", key: "carbs_g", label: "Węglowodany", kcalPerGram: 4, cls: "carbs", max: 1000 },
+  { field: "total_fat_g", targetField: "target_fat_g", key: "fat_g", label: "Tłuszcze", kcalPerGram: 9, cls: "fat", max: 400 },
 ];
 
 // Dzień "w celu": spożycie w granicach ±10% celu kcal dnia (regularność liczona tylko z dni z jedzeniem).
@@ -682,14 +682,17 @@ function renderHero(detail) {
   el.ringStatus.innerHTML =
     remaining >= 0 ? `Pozostało <strong>${fmt(remaining)} kcal</strong>` : `<strong>${fmt(-remaining)} kcal</strong> ponad cel`;
 
-  const energy = MACROS.reduce((sum, macro) => sum + (Number(detail[macro.field]) || 0) * macro.kcalPerGram, 0);
+  // Postęp względem celu makro (g) dnia; przekroczenie celu na bursztynowo.
   el.macroList.innerHTML = MACROS.map((macro) => {
     const grams = Number(detail[macro.field]) || 0;
-    const share = energy > 0 ? Math.round(((grams * macro.kcalPerGram) / energy) * 100) : 0;
-    return `<div class="macro">
+    const goal = Number(detail[macro.targetField]) || 0;
+    const pct = goal > 0 ? Math.round((grams / goal) * 100) : 0;
+    const over = goal > 0 && grams > goal;
+    const note = goal > 0 ? (over ? `+${fmt(grams - goal)} g` : `${pct}%`) : "";
+    return `<div class="macro${over ? " over" : ""}">
       <span class="macro-name">${macro.label}</span>
-      <span class="macro-value">${fmt(grams)} g<small>${share}% kcal</small></span>
-      <span class="bar ${macro.cls}" role="img" aria-label="${macro.label}: ${share}% energii z makroskładników"><span style="width:${share}%"></span></span>
+      <span class="macro-value">${fmt(grams)}<small> / ${goal > 0 ? fmt(goal) : "–"} g</small>${note ? `<small class="macro-note">${note}</small>` : ""}</span>
+      <span class="bar ${macro.cls}" role="img" aria-label="${macro.label}: ${fmt(grams)} z ${fmt(goal)} g${over ? ", ponad cel" : ""}"><span style="width:${Math.min(pct, 100)}%"></span></span>
     </div>`;
   }).join("");
   el.balanceNote.hidden = !detail.balance_mode;
@@ -1056,8 +1059,87 @@ const PLAN_STATUS_LABELS = {
 };
 
 async function loadGoals() {
-  renderPlan(await profileApi("/plan"));
+  const [plan, profile] = await Promise.all([profileApi("/plan"), profileApi()]);
+  renderPlan(plan);
+  renderMacroTargets(profile.macro_targets);
 }
+
+// --- Cele: makro (T2.3) - domyślnie z celu kcal, własne wartości opcjonalne ---------------------------
+
+function renderMacroTargets(targets) {
+  if (!targets) return;
+  state.macroTargets = targets;
+  const manualCount = MACROS.filter((macro) => targets[`manual_${macro.key}`] !== null).length;
+  el.macroModeChip.textContent = manualCount ? "Własne" : "Automatycznie";
+  el.macroTargetList.innerHTML = MACROS.map((macro) => {
+    const manual = targets[`manual_${macro.key}`] !== null;
+    return `<div class="kv"><span>${macro.label}</span><strong>${fmt(targets[macro.key])} g<small class="kv-note">${manual ? "własny" : "auto"}</small></strong></div>`;
+  }).join("");
+  el.macroEditBtn.textContent = manualCount ? "Zmień własne cele" : "Ustaw własne cele";
+  el.macroAutoBtn.hidden = !manualCount;
+  MACROS.forEach((macro) => {
+    const input = el[`macro_${macro.key}`];
+    const manual = targets[`manual_${macro.key}`];
+    input.value = manual !== null ? String(manual) : "";
+    input.placeholder = fmt(targets[macro.key]);
+  });
+}
+
+function readMacroForm() {
+  const body = {};
+  for (const macro of MACROS) {
+    const raw = el[`macro_${macro.key}`].value.trim().replace(",", ".");
+    if (!raw) continue;
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value < 0 || value > macro.max) {
+      return { error: `${macro.label}: podaj liczbę od 0 do ${macro.max} g albo zostaw puste pole.` };
+    }
+    body[macro.key] = value;
+  }
+  return { body };
+}
+
+async function saveMacroTargets(button, body) {
+  el.macroFormStatus.textContent = "";
+  try {
+    await withBusy(button, async () => {
+      const profile = await profileApi("/macros", { method: "PUT", body });
+      renderMacroTargets(profile.macro_targets);
+      el.macroForm.hidden = true;
+      el.macroEditBtn.hidden = false;
+      toast(Object.keys(body).length ? "Zapisano własne cele makro." : "Przywrócono automatyczne cele makro.", "success");
+    });
+  } catch (error) {
+    el.macroFormStatus.textContent = error.message;
+    el.macroFormStatus.className = "form-status error";
+  }
+}
+
+el.macroEditBtn.addEventListener("click", () => {
+  el.macroForm.hidden = false;
+  el.macroEditBtn.hidden = true;
+  el.macroFormStatus.textContent = "";
+  el.macro_protein_g.focus();
+});
+
+el.macroCancelBtn.addEventListener("click", () => {
+  renderMacroTargets(state.macroTargets);
+  el.macroForm.hidden = true;
+  el.macroEditBtn.hidden = false;
+});
+
+el.macroForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const result = readMacroForm();
+  if (result.error) {
+    el.macroFormStatus.textContent = result.error;
+    el.macroFormStatus.className = "form-status error";
+    return;
+  }
+  saveMacroTargets(el.macroSaveBtn, result.body);
+});
+
+el.macroAutoBtn.addEventListener("click", () => saveMacroTargets(el.macroAutoBtn, {}));
 
 function renderPlan(plan) {
   state.goalType = plan.goal_type;
@@ -1098,6 +1180,7 @@ el.planApplyBtn.addEventListener("click", async () => {
   try {
     await withBusy(el.planApplyBtn, async () => {
       renderPlan(await profileApi("/plan/apply", { method: "POST", body: { target_kcal: target } }));
+      renderMacroTargets((await profileApi()).macro_targets);
       toast(`Nowy cel planu: ${fmt(target)} kcal/dzień.`, "success");
     });
   } catch (error) {

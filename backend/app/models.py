@@ -56,6 +56,10 @@ class Profile(Base):
     plan_started_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     # Profil jest kompletny dopiero po pierwszym jawnym zapisie przez uzytkownika (brak danych domyslnych).
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Cele makro wpisane recznie (g); NULL = wyliczane z celu kcal (services.macro_targets).
+    protein_target_g: Mapped[float | None] = mapped_column(Float, nullable=True)
+    fat_target_g: Mapped[float | None] = mapped_column(Float, nullable=True)
+    carbs_target_g: Mapped[float | None] = mapped_column(Float, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
     user: Mapped["User"] = relationship(back_populates="profile", passive_deletes=True)

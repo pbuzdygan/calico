@@ -7,6 +7,7 @@ Uruchomienie (z katalogu glownego repo, Pillow w kontenerze):
 Zrodla:
 - branding/calico_icon.png             - ikona na ciemnym tle (favicon, apple-touch-icon)
 - branding/calico_icon_transparent.png - ikona z przezroczystym tlem (ikony PWA "any", logo w UI, "maskable")
+- branding/calico_banner_simple.png    - baner (ekran logowania, nowy uzytkownik, uzupelnienie profilu)
 """
 
 from pathlib import Path
@@ -86,6 +87,14 @@ def main() -> None:
     # Logo w interfejsie (ekran blokady, pasek nawigacji).
     save_png(any_source, 64, "logo-64.png")
     save_png(any_source, 256, "logo-256.png")
+
+    # Baner: JPEG w dwoch szerokosciach (srcset) - pelne tlo, bez przezroczystosci.
+    banner = Image.open(BRANDING / "calico_banner_simple.png").convert("RGB")
+    for width in (720, 1200):  # zrodlo ma 1219 px - bez powiekszania
+        height = round(banner.height * width / banner.width)
+        name = f"banner-{width}.jpg"
+        banner.resize((width, height), Image.LANCZOS).save(OUT / name, quality=84, optimize=True, progressive=True)
+        print(f"{name:32} {width}x{height}  {(OUT / name).stat().st_size // 1024} KB")
 
 
 if __name__ == "__main__":

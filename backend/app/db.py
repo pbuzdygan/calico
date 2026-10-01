@@ -111,11 +111,20 @@ def _migration_4_profile_completion(db: Session) -> None:
     )
 
 
+def _migration_5_macro_targets(db: Session) -> None:
+    """T2.3: opcjonalne, recznie wpisane cele makro w g. NULL = cel wyliczany z celu kcal."""
+    columns = _columns(db.connection(), "profiles")
+    for column in ("protein_target_g", "fat_target_g", "carbs_target_g"):
+        if column not in columns:
+            db.execute(text(f"ALTER TABLE profiles ADD COLUMN {column} FLOAT"))
+
+
 MIGRATIONS = [
     (1, _migration_1_drop_day_status),
     (2, _migration_2_normalize_days),
     (3, _migration_3_plan_fields),
     (4, _migration_4_profile_completion),
+    (5, _migration_5_macro_targets),
 ]
 
 

@@ -24,6 +24,7 @@ from .schemas import (
     EntryDuplicateIn,
     EntryMoveIn,
     EntryUpdateIn,
+    MacroTargetsIn,
     PlanApplyIn,
     PlanStatusOut,
     ProfilePreviewOut,
@@ -200,6 +201,7 @@ def _profile_out(db: Session, user_id: int) -> ProfileOut:
         daily_kcal_target=profile.daily_kcal_target,
         plan_tdee_kcal=profile.plan_tdee_kcal,
         plan_started_on=profile.plan_started_on,
+        macro_targets=services.macro_targets_out(profile),
     )
     latest = services.latest_weight_entry(db, user_id)
     if latest:
@@ -216,6 +218,12 @@ def api_get_profile(user: User = Depends(current_user), db: Session = Depends(ge
 @app.put("/api/profile/{user_id}", response_model=ProfileOut)
 def api_put_profile(payload: ProfileIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     services.upsert_profile(db, user_id=user.id, payload=payload)
+    return _profile_out(db, user.id)
+
+
+@app.put("/api/profile/{user_id}/macros", response_model=ProfileOut)
+def api_put_macro_targets(payload: MacroTargetsIn, user: User = Depends(profiled_user), db: Session = Depends(get_db)):
+    services.set_macro_targets(db, services.get_profile(db, user.id), payload)
     return _profile_out(db, user.id)
 
 

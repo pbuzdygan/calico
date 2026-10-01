@@ -55,9 +55,9 @@
     <!-- EKRAN BLOKADY -->
     <section id="lockScreen" class="lock-screen" aria-labelledby="lockTitle">
       <div class="lock-card">
-        <img class="lock-logo" src="/icons/logo-256.png" width="112" height="112" alt="" />
-        <h1 id="lockTitle" class="wordmark">CALIC<span class="wordmark-o" aria-hidden="true"></span><span class="visually-hidden">O</span></h1>
-        <p class="tagline">Świadome nawyki. Realne efekty.</p>
+        <h1 id="lockTitle" class="lock-banner">
+          <img src="/icons/banner-720.jpg" srcset="/icons/banner-720.jpg 720w, /icons/banner-1200.jpg 1200w" width="1219" height="453" sizes="(min-width: 560px) 520px, calc(100vw - 32px)" alt="CALICO – świadome nawyki, realne efekty" fetchpriority="high" />
+        </h1>
         <form id="unlockForm" class="lock-form">
           <div class="field">
             <label for="userSelect">Użytkownik</label>
@@ -284,6 +284,35 @@
                 <div class="kv"><span>Zapotrzebowanie na starcie planu</span><strong id="goalPlanTdee">–</strong></div>
                 <div class="kv"><span>Plan od</span><strong id="goalPlanSince">–</strong></div>
               </div>
+            </article>
+            <article class="card">
+              <div class="card-head"><h2 class="card-title"><svg class="icon icon-teal"><use href="#i-flame" /></svg>Cele makro</h2><span id="macroModeChip" class="chip"></span></div>
+              <p class="card-sub">Domyślnie wyliczane z celu kcal: białko 25% i tłuszcze 30% energii, węglowodany – reszta. Własne cele są opcjonalne.</p>
+              <div id="macroTargetList" class="kv-list"></div>
+              <button id="macroEditBtn" class="btn btn-quiet" type="button">Ustaw własne cele</button>
+              <form id="macroForm" class="macro-target-form" hidden novalidate>
+                <div class="macro-target-grid">
+                  <div class="field">
+                    <label for="macro_protein_g">Białko</label>
+                    <input id="macro_protein_g" type="number" inputmode="decimal" min="0" max="500" step="1" />
+                  </div>
+                  <div class="field">
+                    <label for="macro_carbs_g">Węglowodany</label>
+                    <input id="macro_carbs_g" type="number" inputmode="decimal" min="0" max="1000" step="1" />
+                  </div>
+                  <div class="field">
+                    <label for="macro_fat_g">Tłuszcze</label>
+                    <input id="macro_fat_g" type="number" inputmode="decimal" min="0" max="400" step="1" />
+                  </div>
+                </div>
+                <p class="hint">Wartości w gramach. Puste pole = wartość automatyczna (podpowiedź w polu). Gdy wpiszesz tylko białko lub tłuszcze, węglowodany dopełnią cel kcal.</p>
+                <p id="macroFormStatus" class="form-status" aria-live="polite"></p>
+                <div class="button-row">
+                  <button id="macroSaveBtn" class="btn btn-primary" type="submit">Zapisz</button>
+                  <button id="macroCancelBtn" class="btn btn-quiet" type="button">Anuluj</button>
+                </div>
+              </form>
+              <button id="macroAutoBtn" class="btn btn-quiet" type="button" hidden>Przywróć automatyczne</button>
             </article>
             <article class="card">
               <div class="card-head"><h2 class="card-title"><svg class="icon icon-blue"><use href="#i-scale" /></svg>Waga</h2></div>
@@ -534,6 +563,7 @@
     <dialog id="userDialog" class="sheet" aria-labelledby="userDialogTitle">
       <form id="userDialogForm" class="sheet-body">
         <div class="sheet-grabber" aria-hidden="true"></div>
+        <img class="sheet-banner" src="/icons/banner-720.jpg" srcset="/icons/banner-720.jpg 720w, /icons/banner-1200.jpg 1200w" width="1219" height="453" sizes="(min-width: 560px) 520px, calc(100vw - 32px)" alt="" />
         <header class="sheet-head">
           <h2 id="userDialogTitle">Nowy użytkownik</h2>
           <button class="icon-btn" type="button" data-close aria-label="Zamknij"><svg class="icon"><use href="#i-close" /></svg></button>
@@ -560,6 +590,7 @@
     <!-- Wymuszone uzupełnienie profilu (nie da się zamknąć) -->
     <dialog id="onboardingDialog" class="sheet sheet-tall" aria-labelledby="onboardingTitle">
       <form id="onboardingForm" class="sheet-body" novalidate>
+        <img class="sheet-banner" src="/icons/banner-720.jpg" srcset="/icons/banner-720.jpg 720w, /icons/banner-1200.jpg 1200w" width="1219" height="453" sizes="(min-width: 560px) 520px, calc(100vw - 32px)" alt="" />
         <header class="sheet-head">
           <div>
             <h2 id="onboardingTitle">Uzupełnij profil</h2>

@@ -1,5 +1,5 @@
 // Calico – service worker: powłoka aplikacji offline. Dane (/api) nigdy nie trafiają do cache.
-const CACHE = "calico-shell-v3";
+const CACHE = "calico-shell-v4";
 const SHELL = [
   "/",
   "/index.html",
@@ -9,7 +9,7 @@ const SHELL = [
   "/fonts/inter-latin.woff2",
   "/fonts/inter-latin-ext.woff2",
   "/icons/logo-64.png",
-  "/icons/logo-256.png",
+  "/icons/banner-720.jpg",
   "/icons/favicon-32.png",
   "/icons/icon-192.png",
 ];

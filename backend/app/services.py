@@ -13,7 +13,17 @@ from sqlalchemy.orm import Session, selectinload
 from . import clock
 from .config import settings
 from .models import AppMeta, DayEntry, DayLog, Profile, User
-from .schemas import DayDetailOut, DayEntryOut, DayTotalsOut, EntryValuesIn, ProfileIn, ReportDayOut, ReportSummaryOut
+from .schemas import (
+    DayDetailOut,
+    DayEntryOut,
+    DayTotalsOut,
+    EntryValuesIn,
+    MacroTargetsIn,
+    MacroTargetsOut,
+    ProfileIn,
+    ReportDayOut,
+    ReportSummaryOut,
+)
 from .security import create_session_token, hash_pin, new_secret, pin_fingerprint, read_session_token, validate_pin, verify_pin
 
 
@@ -42,6 +52,12 @@ POLISH_TRANSLATION_TABLE = str.maketrans(
         "ź": "z",
     }
 )
+
+# T2.3: domyslny podzial celu kcal na makro (ogolne zalozenie). Bialko i tluszcz jako % energii celu,
+# weglowodany = reszta energii. Recznie wpisany cel (Profile.*_target_g) zastepuje wartosc wyliczona.
+MACRO_AUTO_PROTEIN_PCT = 0.25
+MACRO_AUTO_FAT_PCT = 0.30
+KCAL_PER_G = {"protein": 4, "fat": 9, "carbs": 4}
 
 ACTIVITY_MULTIPLIER = {
     "sedentary": 1.2,
@@ -334,6 +350,41 @@ def calculate_target(profile) -> float:
     return round(tdee, 0)
 
 
+def macro_targets(
+    target_kcal: float, protein_g: float | None = None, fat_g: float | None = None, carbs_g: float | None = None
+) -> dict[str, float]:
+    """Cele makro (g) dla celu kcal. Pola podane recznie maja pierwszenstwo; weglowodany domyslnie dopelniaja energie."""
+    protein = protein_g if protein_g is not None else round(target_kcal * MACRO_AUTO_PROTEIN_PCT / KCAL_PER_G["protein"])
+    fat = fat_g if fat_g is not None else round(target_kcal * MACRO_AUTO_FAT_PCT / KCAL_PER_G["fat"])
+    if carbs_g is None:
+        remaining_kcal = target_kcal - protein * KCAL_PER_G["protein"] - fat * KCAL_PER_G["fat"]
+        carbs_g = max(0, round(remaining_kcal / KCAL_PER_G["carbs"]))
+    return {"protein_g": round(protein, 1), "fat_g": round(fat, 1), "carbs_g": round(carbs_g, 1)}
+
+
+def profile_macro_targets(profile: Profile, target_kcal: float | None = None) -> dict[str, float]:
+    kcal = profile.daily_kcal_target if target_kcal is None else target_kcal
+    return macro_targets(kcal, profile.protein_target_g, profile.fat_target_g, profile.carbs_target_g)
+
+
+def macro_targets_out(profile: Profile) -> MacroTargetsOut:
+    return MacroTargetsOut(
+        kcal_target=profile.daily_kcal_target,
+        **profile_macro_targets(profile),
+        manual_protein_g=profile.protein_target_g,
+        manual_fat_g=profile.fat_target_g,
+        manual_carbs_g=profile.carbs_target_g,
+    )
+
+
+def set_macro_targets(db: Session, profile: Profile, payload: MacroTargetsIn) -> None:
+    """Reczne cele makro sa opcjonalne i nie zmieniaja planu kcal (D2b) - nie wolamy set_plan_target."""
+    profile.protein_target_g = payload.protein_g
+    profile.fat_target_g = payload.fat_g
+    profile.carbs_target_g = payload.carbs_g
+    db.flush()
+
+
 def get_profile(db: Session, user_id: int) -> Profile | None:
     return db.scalar(select(Profile).where(Profile.user_id == user_id))
 
@@ -543,15 +594,35 @@ def refresh_day(db: Session, day_log: DayLog) -> list[DayEntry]:
     return entries
 
 
-def day_totals_out(db: Session, user_id: int, log_date: date, day_log: DayLog | None = None, entries_count: int | None = None) -> DayTotalsOut:
-    """Sumy dnia bez tworzenia wiersza DayLog, gdy dzien jeszcze nie istnieje."""
+def _day_macro_targets(profile: Profile | None, target_kcal: float) -> dict[str, float]:
+    if profile is None or not target_kcal:
+        return {}
+    targets = profile_macro_targets(profile, target_kcal)
+    return {f"target_{key}": value for key, value in targets.items()}
+
+
+def day_totals_out(
+    db: Session,
+    user_id: int,
+    log_date: date,
+    day_log: DayLog | None = None,
+    entries_count: int | None = None,
+    profile: Profile | None = None,
+) -> DayTotalsOut:
+    """Sumy dnia bez tworzenia wiersza DayLog, gdy dzien jeszcze nie istnieje. Cele makro liczone od celu kcal dnia."""
+    if profile is None:
+        profile = get_profile(db, user_id)
     if day_log is None:
         day_log = get_day_log(db, user_id, log_date)
     if day_log is None:
-        return DayTotalsOut(user_id=user_id, log_date=log_date, total_kcal=0.0, target_kcal=round(current_target(db, user_id), 1))
+        target = round(profile.daily_kcal_target if profile else 0.0, 1)
+        return DayTotalsOut(
+            user_id=user_id, log_date=log_date, total_kcal=0.0, target_kcal=target, **_day_macro_targets(profile, target)
+        )
     if entries_count is None:
         entries_count = len(list_day_entries(db, day_log))
     return DayTotalsOut(
+        **_day_macro_targets(profile, day_log.daily_kcal_target_snapshot),
         user_id=user_id,
         log_date=day_log.log_date,
         total_kcal=round(day_log.total_kcal, 1),
@@ -606,7 +677,11 @@ def list_days(
     if date_to is not None:
         query = query.where(DayLog.log_date <= date_to)
     rows = db.execute(query.group_by(DayLog.id).order_by(DayLog.log_date.desc()).limit(safe_limit)).all()
-    return [day_totals_out(db, user_id, day_log.log_date, day_log=day_log, entries_count=count) for day_log, count in rows]
+    profile = get_profile(db, user_id)
+    return [
+        day_totals_out(db, user_id, day_log.log_date, day_log=day_log, entries_count=count, profile=profile)
+        for day_log, count in rows
+    ]
 
 
 # --- wpisy ----------------------------------------------------------------------

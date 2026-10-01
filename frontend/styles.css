@@ -502,51 +502,42 @@ input[type="date"] {
 }
 
 .lock-card {
-  width: min(400px, 100%);
+  width: min(520px, 100%);
   display: grid;
   justify-items: center;
   gap: 10px;
   text-align: center;
 }
 
-.lock-logo {
-  width: 112px;
-  height: 112px;
-  filter: drop-shadow(0 12px 40px rgba(32, 213, 255, 0.25));
+/* Baner marki (branding/calico_banner_simple.png) - ekran logowania i pierwszego startu. */
+.lock-banner {
+  width: 100%;
+  margin: 0 0 6px;
+  line-height: 0;
 }
 
-.wordmark {
-  margin: 6px 0 0;
-  font-size: 2.3rem;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  padding-left: 0.16em;
+.lock-banner img,
+.sheet-banner {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-hero);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35), 0 0 60px var(--accent-glow);
 }
 
-.wordmark-o {
-  display: inline-block;
-  width: 0.78em;
-  height: 0.78em;
-  margin-left: 0.04em;
-  border-radius: 50%;
-  background: conic-gradient(from 0deg, #32e6c4 0deg, #20d5ff 60deg, #1aa8ff 180deg, #3b6cff 270deg, rgba(125, 185, 255, 0.16) 272deg 360deg);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 0.15em), #000 calc(100% - 0.14em));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 0.15em), #000 calc(100% - 0.14em));
-}
-
-.tagline {
-  margin: 0 0 18px;
-  font-size: 0.78rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: #8fb4e0;
+/* W panelu: niższy kadr (logo, napis i hasło zostają), żeby formularz był od razu widoczny. */
+.sheet-banner {
+  aspect-ratio: 1219 / 360;
+  object-fit: cover;
+  object-position: center 75%; /* pierścień logo sięga ~92% wysokości grafiki */
+  border-radius: var(--radius-card);
+  box-shadow: 0 0 40px var(--accent-glow);
 }
 
 .lock-form {
-  width: 100%;
+  width: min(420px, 100%);
   display: grid;
   gap: 14px;
   padding: 20px;
@@ -1001,6 +992,39 @@ button.card:hover {
 
 .bar.fat > span {
   background: var(--macro-fat);
+}
+
+.macro-note {
+  margin-left: 6px;
+}
+
+/* Przekroczenie celu makro: bursztyn (nie czerwony) - liczba i obwódka paska. */
+.macro.over .macro-value,
+.macro.over .macro-note {
+  color: var(--warning);
+}
+
+.macro.over .bar {
+  box-shadow: 0 0 0 1px var(--warning);
+}
+
+.kv-note {
+  margin-left: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.macro-target-form {
+  display: grid;
+  gap: 12px;
+}
+
+.macro-target-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  align-items: end;
 }
 
 .metric-row {

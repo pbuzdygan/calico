@@ -52,6 +52,7 @@ docker run --rm -v "$PWD:/repo" -w /repo python:3.12-slim \
 - Wpisy `Waga` służą do monitorowania: profil pokazuje aktualną wagę obok wagi planu, ale cel się nie zmienia.
 - Ocena planu (`app/plan.py`): trend masy z regresji pomiarów od startu planu (min. 4 pomiary z 14 dni), porównany z tempem wynikającym z planu. W zakresie → cel bez zmian, nawet jeśli szacowane TDEE spadło. Poza zakresem → przez pierwsze 21 dni „obserwuj”, potem sugestia korekty o 100–200 kcal (nie poniżej 1500 kcal dla mężczyzn / 1200 kcal dla kobiet). Gdy wpisy jedzenia pokrywają ≥ 70% dni, TDEE jest szacowane także z faktycznego spożycia i zmiany masy.
 - Zmiana celu aktualizuje cel dnia dzisiejszego i przyszłych; przeszłe dni zachowują swój cel.
+- Cele makro (g) są domyślnie wyliczane z celu kcal dnia: białko 25% i tłuszcze 30% energii, węglowodany dopełniają resztę (stałe `MACRO_AUTO_*` w `services.py`). Własne cele w zakładce `Cele` są opcjonalne – każde pole osobno, puste = automatycznie; gdy wpiszesz tylko białko lub tłuszcze, węglowodany dalej dopełniają cel kcal. Zmiana celów makro nie zmienia planu kcal. Na „Dziś” paski pokazują postęp względem celu; przekroczenie jest bursztynowe.
 - Raporty liczą średnie i dni powyżej/poniżej celu tylko z dni, w których jest wpis jedzenia (posiłek lub bilans).
 - Zakresy wartości: kcal 0–10 000, makro 0–1 000 g, waga 30–300 kg, obwód 30–250 cm.
 
@@ -128,7 +129,8 @@ Użytkownicy i profil:
 - `GET /api/users` (pusta lista = pierwszy start), `POST /api/users` — `{"display_name": "Ala", "pin": "2468"}`, `DELETE /api/users/{user_id}`
 - `POST /api/users/{user_id}/pin` — `{"new_pin": "5678"}`; unieważnia stare tokeny i zwraca nowy
 - `POST /api/auth/verify` — `{"user_id": 1, "pin": "1234"}` → `{"ok": true, "token": "…", "expires_at": "…"}`
-- `GET|PUT /api/profile/{user_id}` — `is_complete=false` i puste pola, dopóki profil nie zostanie zapisany; `PUT` wymaga wszystkich pól. `weight_kg` to waga planu, `current_weight_kg` to ostatni pomiar
+- `GET|PUT /api/profile/{user_id}` — `is_complete=false` i puste pola, dopóki profil nie zostanie zapisany; `PUT` wymaga wszystkich pól. `weight_kg` to waga planu, `current_weight_kg` to ostatni pomiar. `macro_targets`: obowiązujące cele `protein_g`, `fat_g`, `carbs_g` oraz `manual_*` (null = automatycznie)
+- `PUT /api/profile/{user_id}/macros` — `{"protein_g": 170}`; pola opcjonalne (brak/null = automatycznie, `{}` przywraca automatyczne), zakresy: białko 0–500, tłuszcze 0–400, węglowodany 0–1000 g
 - `POST /api/profile/{user_id}/preview` — podgląd BMR/TDEE/celu dla danych z formularza (bez zapisu, działa przed uzupełnieniem profilu)
 - `GET /api/profile/{user_id}/plan` — ocena planu (status, trend, TDEE, sugestia)
 - `POST /api/profile/{user_id}/plan/apply` — `{"target_kcal": 2460}` akceptuje bieżącą sugestię (409, jeśli się zmieniła)
@@ -137,7 +139,7 @@ Dni i wpisy (odczyt nigdy nie tworzy dnia w bazie):
 
 - `GET /api/days/current?user_id=`
 - `GET /api/days?user_id=&limit=&date_from=&date_to=` — tylko dni z wpisami (zakres dat używa kalendarz Dziennika)
-- `GET /api/days/{date}?user_id=`
+- `GET /api/days/{date}?user_id=` — sumy dnia, wpisy oraz cele makro dnia `target_protein_g`, `target_fat_g`, `target_carbs_g` (liczone od celu kcal dnia; także w `GET /api/days` i `/api/days/current`)
 - `POST /api/days/{date}/entries?user_id=` — `{"entry_type": "lunch", "kcal": 600, "carbs_g": 60, "fat_g": 20, "protein_g": 40}` lub `{"entry_type": "weight", "weight_kg": 82.4}`
 - `PATCH /api/days/{date}/entries/{id}?user_id=` — `{"entry": {...}}` albo `{"source_text": "..."}`
 - `POST /api/days/{date}/entries/{id}/move?user_id=` — `{"target_date": "2026-06-14"}`

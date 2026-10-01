@@ -37,6 +37,26 @@ class ProfileIn(BaseModel):
     goal_delta_pct: float = Field(ge=0.0, le=0.3)
 
 
+class MacroTargetsIn(BaseModel):
+    """Opcjonalne cele makro w g. Brak pola / null = cel wyliczany automatycznie z celu kcal."""
+
+    protein_g: float | None = Field(default=None, ge=0, le=500)
+    fat_g: float | None = Field(default=None, ge=0, le=400)
+    carbs_g: float | None = Field(default=None, ge=0, le=1000)
+
+
+class MacroTargetsOut(BaseModel):
+    """Obowiazujace cele makro (g) dla celu kcal profilu; manual_* = wartosci wpisane recznie (null = auto)."""
+
+    kcal_target: float
+    protein_g: float
+    fat_g: float
+    carbs_g: float
+    manual_protein_g: float | None = None
+    manual_fat_g: float | None = None
+    manual_carbs_g: float | None = None
+
+
 class ProfileOut(BaseModel):
     """Dla niekompletnego profilu (is_complete=False) pola danych sa puste."""
 
@@ -54,6 +74,7 @@ class ProfileOut(BaseModel):
     plan_started_on: date | None = None
     current_weight_kg: float | None = None
     current_weight_date: date | None = None
+    macro_targets: MacroTargetsOut | None = None
 
 
 class ProfilePreviewOut(BaseModel):
@@ -129,6 +150,9 @@ class DayTotalsOut(BaseModel):
     total_protein_g: float = 0.0
     balance_mode: bool = False
     entries_count: int = 0
+    target_protein_g: float | None = None
+    target_fat_g: float | None = None
+    target_carbs_g: float | None = None
 
 
 class ChatResponseOut(DayTotalsOut):
