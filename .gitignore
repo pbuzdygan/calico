@@ -5,3 +5,6 @@ __pycache__/
 .DS_Store
 /data/
 .ruff_cache/
+
+# fixture testu migracji (globalny gitignore moze wykluczac *.sql)
+!backend/tests/fixtures/*.sql
