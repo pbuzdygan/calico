@@ -746,6 +746,19 @@ button.card:hover {
   line-height: 1.55;
 }
 
+/* T2.7: prognoza daty osiągnięcia wagi docelowej */
+.forecast {
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border-strong);
+  background: var(--accent-glow);
+  font-size: 0.9rem;
+}
+
+.forecast:empty {
+  display: none;
+}
+
 .card-link {
   display: inline-flex;
   align-items: center;

@@ -1063,6 +1063,7 @@ async function loadGoals() {
   const [plan, profile] = await Promise.all([profileApi("/plan"), profileApi()]);
   renderPlan(plan);
   renderMacroTargets(profile.macro_targets);
+  el.targetWeightInput.value = profile.target_weight_kg !== null ? String(profile.target_weight_kg) : "";
 }
 
 // --- Cele: makro (T2.3) - domyślnie z celu kcal, własne wartości opcjonalne ---------------------------
@@ -1154,6 +1155,11 @@ function renderPlan(plan) {
   el.goalWeightChange.textContent =
     plan.weight_change_since_plan_kg !== null ? `${fmtSigned(plan.weight_change_since_plan_kg, 1)} kg (${fmtSigned(plan.weight_change_since_plan_pct, 1)}%)` : "–";
   el.goalObservedRate.textContent = plan.observed_rate_kg_per_week !== null ? paceText(plan.observed_rate_kg_per_week) : `– (${plan.measurements_count} pomiarów)`;
+  el.goalTargetWeight.textContent =
+    plan.target_weight_kg !== null
+      ? `${fmt(plan.target_weight_kg, 1)} kg${plan.target_weight_remaining_kg !== null ? ` (${fmtSigned(plan.target_weight_remaining_kg, 1)} kg)` : ""}`
+      : "–";
+  el.goalForecast.textContent = plan.forecast_message || "";
 
   el.planStatusBadge.textContent = PLAN_STATUS_LABELS[plan.status] || plan.status;
   el.planStatusBadge.className = `chip status-${plan.status}`;
@@ -1171,6 +1177,28 @@ function renderPlan(plan) {
   el.planApplyBtn.hidden = plan.suggested_target_kcal === null;
   if (plan.suggested_target_kcal !== null) el.planApplyBtn.textContent = `Zastosuj sugestię: ${fmt(plan.suggested_target_kcal)} kcal`;
 }
+
+el.targetWeightForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const raw = el.targetWeightInput.value.trim().replace(",", ".");
+  const value = raw ? Number(raw) : null;
+  el.targetWeightStatus.textContent = "";
+  if (value !== null && (!Number.isFinite(value) || value < 30 || value > 300)) {
+    el.targetWeightStatus.textContent = "Podaj wagę od 30 do 300 kg albo zostaw puste pole.";
+    el.targetWeightStatus.className = "form-status error";
+    return;
+  }
+  try {
+    await withBusy(el.targetWeightSaveBtn, async () => {
+      await profileApi("/target-weight", { method: "PUT", body: { target_weight_kg: value } });
+      renderPlan(await profileApi("/plan"));
+      toast(value === null ? "Usunięto wagę docelową." : `Waga docelowa: ${fmt(value, 1)} kg.`, "success");
+    });
+  } catch (error) {
+    el.targetWeightStatus.textContent = error.message;
+    el.targetWeightStatus.className = "form-status error";
+  }
+});
 
 el.planRefreshBtn.addEventListener("click", () => withBusy(el.planRefreshBtn, loadGoals).catch(toastError));
 

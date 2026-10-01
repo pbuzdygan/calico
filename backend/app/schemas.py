@@ -57,6 +57,12 @@ class MacroTargetsOut(BaseModel):
     manual_carbs_g: float | None = None
 
 
+class TargetWeightIn(BaseModel):
+    """null = brak wagi docelowej."""
+
+    target_weight_kg: float | None = Field(default=None, ge=30, le=300)
+
+
 class ProfileOut(BaseModel):
     """Dla niekompletnego profilu (is_complete=False) pola danych sa puste."""
 
@@ -75,6 +81,7 @@ class ProfileOut(BaseModel):
     current_weight_kg: float | None = None
     current_weight_date: date | None = None
     macro_targets: MacroTargetsOut | None = None
+    target_weight_kg: float | None = None
 
 
 class ProfilePreviewOut(BaseModel):
@@ -86,6 +93,7 @@ class ProfilePreviewOut(BaseModel):
     delta_kcal: float
 
 
+ForecastBasis = Literal["trend", "plan"]
 PlanStatus = Literal["no_data", "wait", "on_track", "below_range", "above_range"]
 PlanRecommendation = Literal["keep", "increase", "decrease"]
 
@@ -116,6 +124,11 @@ class PlanStatusOut(BaseModel):
     recommendation: PlanRecommendation
     suggested_target_kcal: float | None = None
     reevaluation_due: bool = False
+    target_weight_kg: float | None = None
+    target_weight_remaining_kg: float | None = None
+    forecast_date: date | None = None
+    forecast_basis: ForecastBasis | None = None
+    forecast_message: str | None = None
     message: str
     notes: list[str] = Field(default_factory=list)
 

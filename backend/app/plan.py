@@ -36,6 +36,10 @@ MIN_STEP_KCAL = 100
 DEFAULT_STEP_KCAL = 150
 MAX_STEP_KCAL = 200
 MIN_TARGET_KCAL = {"male": 1500, "female": 1200}
+# T2.7: prognoza osiagniecia wagi docelowej
+TARGET_REACHED_KG = 0.3  # |waga docelowa - srednia masa| ponizej tej wartosci = osiagnieta
+FORECAST_MIN_RATE_KG_PER_WEEK = 0.05  # wolniejsze tempo traktujemy jak brak zmiany
+FORECAST_MAX_DAYS = 3 * 365
 
 
 @dataclass
@@ -97,6 +101,51 @@ def evaluate_plan(db: Session, user_id: int) -> PlanStatusOut:
     profile: Profile | None = services.get_profile(db, user_id)
     if profile is None:
         raise services.NotFoundError("Nie znaleziono profilu.")
+    status = _evaluate(db, user_id, profile)
+    _add_forecast(status, profile)
+    return status
+
+
+def _add_forecast(status: PlanStatusOut, profile: Profile) -> None:
+    """Prognoza daty osiagniecia wagi docelowej: z trendu masy, a bez trendu - z tempa wynikajacego z planu.
+
+    Tylko informacja - nie wplywa na cel kcal (D2b).
+    """
+    target = profile.target_weight_kg
+    if target is None:
+        return
+    status.target_weight_kg = target
+    current = status.trend_weight_kg if status.trend_weight_kg is not None else profile.weight_kg
+    remaining = target - current
+    status.target_weight_remaining_kg = round(remaining, 1)
+    if abs(remaining) < TARGET_REACHED_KG:
+        status.forecast_message = f"Waga docelowa {services.fmt_number(target)} kg osiągnięta."
+        return
+    if status.observed_rate_kg_per_week is not None:
+        rate, basis = status.observed_rate_kg_per_week, "trend"
+        source = f"przy obecnym trendzie ({_fmt_rate(rate)})"
+    else:
+        rate, basis = status.expected_rate_kg_per_week, "plan"
+        source = f"według tempa planu ({_fmt_rate(rate)}; za mało pomiarów do trendu)" if rate is not None else ""
+    status.forecast_basis = basis if rate is not None else None
+    if rate is None or abs(rate) < FORECAST_MIN_RATE_KG_PER_WEEK or rate * remaining <= 0:
+        if basis == "trend":
+            status.forecast_message = f"Obecny trend ({_fmt_rate(rate)}) nie prowadzi do wagi docelowej {services.fmt_number(target)} kg."
+        else:
+            status.forecast_message = f"Plan nie zakłada zmiany masy w kierunku wagi docelowej {services.fmt_number(target)} kg."
+        return
+    days = round(remaining / rate * 7)
+    if days > FORECAST_MAX_DAYS:
+        status.forecast_message = f"Waga docelowa {services.fmt_number(target)} kg za ponad 3 lata – {source}."
+        return
+    status.forecast_date = clock.today() + timedelta(days=days)
+    status.forecast_message = (
+        f"Waga docelowa {services.fmt_number(target)} kg około {services.fmt_date(status.forecast_date)} "
+        f"(za ok. {max(1, round(days / 7))} tyg.) – {source}."
+    )
+
+
+def _evaluate(db: Session, user_id: int, profile: Profile) -> PlanStatusOut:
 
     today = clock.today()
     plan_started_on = profile.plan_started_on or today

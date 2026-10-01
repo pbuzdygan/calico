@@ -128,6 +128,12 @@ def _migration_6_pin_lockout(db: Session) -> None:
         db.execute(text("ALTER TABLE users ADD COLUMN pin_locked_until DATETIME"))
 
 
+def _migration_7_target_weight(db: Session) -> None:
+    """T2.7: opcjonalna waga docelowa (prognoza daty osiagniecia z trendu)."""
+    if "target_weight_kg" not in _columns(db.connection(), "profiles"):
+        db.execute(text("ALTER TABLE profiles ADD COLUMN target_weight_kg FLOAT"))
+
+
 MIGRATIONS = [
     (1, _migration_1_drop_day_status),
     (2, _migration_2_normalize_days),
@@ -135,6 +141,7 @@ MIGRATIONS = [
     (4, _migration_4_profile_completion),
     (5, _migration_5_macro_targets),
     (6, _migration_6_pin_lockout),
+    (7, _migration_7_target_weight),
 ]
 
 

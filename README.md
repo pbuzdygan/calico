@@ -52,6 +52,7 @@ docker run --rm -v "$PWD:/repo" -w /repo python:3.12-slim \
 - Wpisy `Waga` służą do monitorowania: profil pokazuje aktualną wagę obok wagi planu, ale cel się nie zmienia.
 - Ocena planu (`app/plan.py`): trend masy z regresji pomiarów od startu planu (min. 4 pomiary z 14 dni), porównany z tempem wynikającym z planu. W zakresie → cel bez zmian, nawet jeśli szacowane TDEE spadło. Poza zakresem → przez pierwsze 21 dni „obserwuj”, potem sugestia korekty o 100–200 kcal (nie poniżej 1500 kcal dla mężczyzn / 1200 kcal dla kobiet). Gdy wpisy jedzenia pokrywają ≥ 70% dni, TDEE jest szacowane także z faktycznego spożycia i zmiany masy.
 - Zmiana celu aktualizuje cel dnia dzisiejszego i przyszłych; przeszłe dni zachowują swój cel.
+- Waga docelowa (opcjonalna, zakładka `Cele`) służy tylko prognozie: data osiągnięcia liczona z trendu masy z oceny planu, a bez trendu – z tempa wynikającego z planu. Nie zmienia celu kcal (D2b).
 - Cele makro (g) są domyślnie wyliczane z celu kcal dnia: białko 25% i tłuszcze 30% energii, węglowodany dopełniają resztę (stałe `MACRO_AUTO_*` w `services.py`). Własne cele w zakładce `Cele` są opcjonalne – każde pole osobno, puste = automatycznie; gdy wpiszesz tylko białko lub tłuszcze, węglowodany dalej dopełniają cel kcal. Zmiana celów makro nie zmienia planu kcal. Na „Dziś” paski pokazują postęp względem celu; przekroczenie jest bursztynowe.
 - Raporty liczą średnie i dni powyżej/poniżej celu tylko z dni, w których jest wpis jedzenia (posiłek lub bilans).
 - Zakresy wartości: kcal 0–10 000, makro 0–1 000 g, waga 30–300 kg, obwód 30–250 cm.
@@ -134,7 +135,8 @@ Użytkownicy i profil:
 - `GET|PUT /api/profile/{user_id}` — `is_complete=false` i puste pola, dopóki profil nie zostanie zapisany; `PUT` wymaga wszystkich pól. `weight_kg` to waga planu, `current_weight_kg` to ostatni pomiar. `macro_targets`: obowiązujące cele `protein_g`, `fat_g`, `carbs_g` oraz `manual_*` (null = automatycznie)
 - `PUT /api/profile/{user_id}/macros` — `{"protein_g": 170}`; pola opcjonalne (brak/null = automatycznie, `{}` przywraca automatyczne), zakresy: białko 0–500, tłuszcze 0–400, węglowodany 0–1000 g
 - `POST /api/profile/{user_id}/preview` — podgląd BMR/TDEE/celu dla danych z formularza (bez zapisu, działa przed uzupełnieniem profilu)
-- `GET /api/profile/{user_id}/plan` — ocena planu (status, trend, TDEE, sugestia)
+- `PUT /api/profile/{user_id}/target-weight` — `{"target_weight_kg": 85}` albo `null` (usuwa); 30–300 kg
+- `GET /api/profile/{user_id}/plan` — ocena planu (status, trend, TDEE, sugestia) oraz prognoza wagi docelowej: `target_weight_kg`, `target_weight_remaining_kg`, `forecast_date`, `forecast_basis` (`trend`/`plan`), `forecast_message`
 - `POST /api/profile/{user_id}/plan/apply` — `{"target_kcal": 2460}` akceptuje bieżącą sugestię (409, jeśli się zmieniła)
 
 Dni i wpisy (odczyt nigdy nie tworzy dnia w bazie):

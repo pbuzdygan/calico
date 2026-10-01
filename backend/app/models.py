@@ -63,6 +63,8 @@ class Profile(Base):
     protein_target_g: Mapped[float | None] = mapped_column(Float, nullable=True)
     fat_target_g: Mapped[float | None] = mapped_column(Float, nullable=True)
     carbs_target_g: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # T2.7: opcjonalna waga docelowa - tylko do prognozy, nie zmienia celu kcal (D2b).
+    target_weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
     user: Mapped["User"] = relationship(back_populates="profile", passive_deletes=True)

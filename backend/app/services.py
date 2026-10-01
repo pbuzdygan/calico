@@ -403,6 +403,12 @@ def set_macro_targets(db: Session, profile: Profile, payload: MacroTargetsIn) ->
     db.flush()
 
 
+def set_target_weight(db: Session, profile: Profile, target_weight_kg: float | None) -> None:
+    """Waga docelowa sluzy tylko prognozie - nie zmienia planu kcal (D2b)."""
+    profile.target_weight_kg = round(target_weight_kg, 1) if target_weight_kg is not None else None
+    db.flush()
+
+
 def get_profile(db: Session, user_id: int) -> Profile | None:
     return db.scalar(select(Profile).where(Profile.user_id == user_id))
 
