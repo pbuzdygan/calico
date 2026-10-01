@@ -123,12 +123,13 @@ Wolumen z danymi zostaje ten sam. Przy pierwszym starcie baza jest migrowana aut
 
 ## API
 
-Wszystkie endpointy danych wymagają parametru `user_id` (query albo ścieżka) oraz uwierzytelnienia: `Authorization: Bearer <token>` (token z `POST /api/auth/verify`, ważny `SESSION_TTL_HOURS`) albo nagłówka `X-User-PIN`. Błędy: `401` zły PIN, `404` brak obiektu, `409` konflikt (np. drugi wpis `Waga` w dniu), `422` niepoprawne dane, `428` profil nieuzupełniony (dotyczy dni, wpisów, raportów, planu, eksportu i czatu).
+Wszystkie endpointy danych wymagają parametru `user_id` (query albo ścieżka) oraz uwierzytelnienia: `Authorization: Bearer <token>` (token z `POST /api/auth/verify`, ważny `SESSION_TTL_HOURS`) albo nagłówka `X-User-PIN`. Błędy: `401` zły PIN, `403` zakładanie kont wyłączone, `404` brak obiektu, `409` konflikt (np. drugi wpis `Waga` w dniu), `422` niepoprawne dane, `429` PIN zablokowany po błędnych próbach, `428` profil nieuzupełniony (dotyczy dni, wpisów, raportów, planu, eksportu i czatu).
 
 Użytkownicy i profil:
 
 - `GET /api/users` (pusta lista = pierwszy start), `POST /api/users` — `{"display_name": "Ala", "pin": "2468"}` (`403`, gdy `ALLOW_SIGNUP=false` i istnieje już użytkownik), `DELETE /api/users/{user_id}`
 - `POST /api/users/{user_id}/pin` — `{"new_pin": "5678"}`; unieważnia stare tokeny i zwraca nowy
+- Blokada PIN-u: po 5 błędnych próbach konto jest blokowane na 5 min, kolejne serie po 10, 20, 40 i maks. 60 min (`429` z nagłówkiem `Retry-After`, także przy poprawnym PIN-ie). Poprawny PIN zeruje licznik. Otwarta sesja (token) działa dalej. Stałe `PIN_*` w `services.py`.
 - `POST /api/auth/verify` — `{"user_id": 1, "pin": "1234"}` → `{"ok": true, "token": "…", "expires_at": "…"}`
 - `GET|PUT /api/profile/{user_id}` — `is_complete=false` i puste pola, dopóki profil nie zostanie zapisany; `PUT` wymaga wszystkich pól. `weight_kg` to waga planu, `current_weight_kg` to ostatni pomiar. `macro_targets`: obowiązujące cele `protein_g`, `fat_g`, `carbs_g` oraz `manual_*` (null = automatycznie)
 - `PUT /api/profile/{user_id}/macros` — `{"protein_g": 170}`; pola opcjonalne (brak/null = automatycznie, `{}` przywraca automatyczne), zakresy: białko 0–500, tłuszcze 0–400, węglowodany 0–1000 g

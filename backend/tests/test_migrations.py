@@ -21,7 +21,7 @@ def test_upgrade_from_initial_alpha(client):
     con = sqlite3.connect(os.environ["SQLITE_PATH"])
     day_columns = [row[1] for row in con.execute("PRAGMA table_info(day_logs)")]
     assert "status" not in day_columns and "closed_at" not in day_columns
-    assert con.execute("SELECT value FROM app_meta WHERE key = 'schema_version'").fetchone()[0] == "5"
+    assert con.execute("SELECT value FROM app_meta WHERE key = 'schema_version'").fetchone()[0] == "6"
     days = con.execute("SELECT log_date, total_kcal FROM day_logs ORDER BY log_date").fetchall()
     assert [day for day, _ in days] == ["2026-09-01", "2026-09-02"]  # pusty dzien usuniety
     labels = [row[0] for row in con.execute("SELECT entry_label FROM day_entries ORDER BY id")]

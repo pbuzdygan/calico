@@ -22,6 +22,9 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(128))
     pin_hash: Mapped[str] = mapped_column(String(256))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # T3.1: blokada po blednych PIN-ach (services.PIN_*).
+    failed_pin_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    pin_locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
 
     profile: Mapped["Profile"] = relationship(

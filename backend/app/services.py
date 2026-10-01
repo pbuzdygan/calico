@@ -39,6 +39,15 @@ class ForbiddenError(PermissionError):
     """Operacja wylaczona konfiguracja (HTTP 403)."""
 
 
+class PinLockedError(Exception):
+    """Za duzo blednych PIN-ow (HTTP 429)."""
+
+    def __init__(self, retry_after_seconds: int):
+        self.retry_after_seconds = retry_after_seconds
+        minutes = max(1, -(-retry_after_seconds // 60))
+        super().__init__(f"Za dużo błędnych prób PIN-u. Spróbuj ponownie za {minutes} min.")
+
+
 class NotFoundError(LookupError):
     """Brak obiektu (HTTP 404)."""
 
@@ -56,6 +65,11 @@ POLISH_TRANSLATION_TABLE = str.maketrans(
         "ź": "z",
     }
 )
+
+# T3.1 / SEC-01: blokada po blednych PIN-ach - co PIN_MAX_ATTEMPTS bledow blokada 5, 10, 20, 40, 60, 60... min.
+PIN_MAX_ATTEMPTS = 5
+PIN_LOCK_BASE_MINUTES = 5
+PIN_LOCK_MAX_MINUTES = 60
 
 # T2.3: domyslny podzial celu kcal na makro (ogolne zalozenie). Bialko i tluszcz jako % energii celu,
 # weglowodany = reszta energii. Recznie wpisany cel (Profile.*_target_g) zastepuje wartosc wyliczona.
@@ -489,13 +503,36 @@ def create_user(db: Session, display_name: str, pin: str) -> User:
     return user
 
 
+def _pin_lock_minutes(failed_attempts: int) -> int:
+    lockouts = failed_attempts // PIN_MAX_ATTEMPTS
+    return min(PIN_LOCK_BASE_MINUTES * 2 ** (lockouts - 1), PIN_LOCK_MAX_MINUTES)
+
+
+def pin_attempts_left(user: User) -> int:
+    return PIN_MAX_ATTEMPTS - (user.failed_pin_attempts or 0) % PIN_MAX_ATTEMPTS
+
+
 def require_user_pin(db: Session, user_id: int, pin: str) -> User | None:
-    if not validate_pin(pin):
-        return None
+    """Sprawdza PIN z blokada po PIN_MAX_ATTEMPTS bledach (rosnaco do PIN_LOCK_MAX_MINUTES).
+
+    Zwraca None przy blednym PIN-ie (licznik zwiekszony - wywolujacy musi zatwierdzic transakcje),
+    rzuca PinLockedError, gdy konto jest zablokowane - nawet przy poprawnym PIN-ie.
+    """
     user = db.get(User, user_id)
-    if not user or not verify_pin(pin, user.pin_hash):
+    if not user:
         return None
-    return user
+    now = clock.utcnow_naive()
+    if user.pin_locked_until and user.pin_locked_until > now:
+        raise PinLockedError(int((user.pin_locked_until - now).total_seconds()))
+    if validate_pin(pin) and verify_pin(pin, user.pin_hash):
+        user.failed_pin_attempts = 0
+        user.pin_locked_until = None
+        return user
+    user.failed_pin_attempts = (user.failed_pin_attempts or 0) + 1
+    if user.failed_pin_attempts % PIN_MAX_ATTEMPTS == 0:
+        user.pin_locked_until = now + timedelta(minutes=_pin_lock_minutes(user.failed_pin_attempts))
+    db.flush()
+    return None
 
 
 def _session_secret(db: Session) -> str:

@@ -89,6 +89,13 @@ async def forbidden_handler(_request: Request, exc: services.ForbiddenError):
     return JSONResponse(status_code=403, content={"detail": str(exc)})
 
 
+@app.exception_handler(services.PinLockedError)
+async def pin_locked_handler(_request: Request, exc: services.PinLockedError):
+    return JSONResponse(
+        status_code=429, content={"detail": str(exc)}, headers={"Retry-After": str(exc.retry_after_seconds)}
+    )
+
+
 @app.exception_handler(services.NotFoundError)
 async def not_found_handler(_request: Request, exc: services.NotFoundError):
     return JSONResponse(status_code=404, content={"detail": str(exc)})
@@ -109,13 +116,29 @@ def get_db():
 AUTH_FAILED_DETAIL = "Sesja wygasła albo PIN jest niepoprawny – odblokuj ponownie."
 
 
+def _check_pin(db: Session, user_id: int, pin: str) -> User | None:
+    user = services.require_user_pin(db, user_id, pin)
+    if user is None:
+        db.commit()  # licznik blednych prob musi przetrwac odpowiedz 401 (get_db robi rollback przy wyjatku)
+    return user
+
+
+def _wrong_pin_detail(db: Session, user_id: int) -> str:
+    user = db.get(User, user_id)
+    if user is None:
+        return "Niepoprawny PIN."
+    if user.pin_locked_until and user.pin_locked_until > clock.utcnow_naive():  # ta proba zalozyla blokade
+        return f"Niepoprawny PIN. {services.PinLockedError(int((user.pin_locked_until - clock.utcnow_naive()).total_seconds()))}"
+    return f"Niepoprawny PIN. Pozostałe próby: {services.pin_attempts_left(user)}."
+
+
 def authenticate(db: Session, user_id: int, x_user_pin: str | None, authorization: str | None) -> User:
     """Token sesji (Authorization: Bearer) albo PIN (X-User-PIN). Token nie wymaga liczenia PBKDF2."""
     user = None
     if authorization and authorization.lower().startswith("bearer "):
         user = services.user_from_session(db, user_id, authorization[7:].strip())
     elif x_user_pin:
-        user = services.require_user_pin(db, user_id, x_user_pin)
+        user = _check_pin(db, user_id, x_user_pin)
     if not user:
         raise HTTPException(status_code=401, detail=AUTH_FAILED_DETAIL)
     return user
@@ -182,9 +205,9 @@ def api_change_pin(payload: PinChangeIn, user: User = Depends(current_user), db:
 
 @app.post("/api/auth/verify", response_model=AuthVerifyOut)
 def api_verify_auth(payload: AuthVerifyIn, db: Session = Depends(get_db)):
-    user = services.require_user_pin(db, payload.user_id, payload.pin)
+    user = _check_pin(db, payload.user_id, payload.pin)
     if not user:
-        raise HTTPException(status_code=401, detail="Niepoprawny PIN")
+        raise HTTPException(status_code=401, detail=_wrong_pin_detail(db, payload.user_id))
     token, expires_at = services.issue_session(db, user)
     return AuthVerifyOut(ok=True, token=token, expires_at=expires_at)
 

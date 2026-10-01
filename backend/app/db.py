@@ -119,12 +119,22 @@ def _migration_5_macro_targets(db: Session) -> None:
             db.execute(text(f"ALTER TABLE profiles ADD COLUMN {column} FLOAT"))
 
 
+def _migration_6_pin_lockout(db: Session) -> None:
+    """T3.1 / SEC-01: licznik blednych PIN-ow i czas blokady per uzytkownik."""
+    columns = _columns(db.connection(), "users")
+    if "failed_pin_attempts" not in columns:
+        db.execute(text("ALTER TABLE users ADD COLUMN failed_pin_attempts INTEGER NOT NULL DEFAULT 0"))
+    if "pin_locked_until" not in columns:
+        db.execute(text("ALTER TABLE users ADD COLUMN pin_locked_until DATETIME"))
+
+
 MIGRATIONS = [
     (1, _migration_1_drop_day_status),
     (2, _migration_2_normalize_days),
     (3, _migration_3_plan_fields),
     (4, _migration_4_profile_completion),
     (5, _migration_5_macro_targets),
+    (6, _migration_6_pin_lockout),
 ]
 
 
