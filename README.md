@@ -2,182 +2,181 @@
 
 ![Calico – Conscious habits. Real results.](branding/calico_banner.png)
 
-CALICO to prosty dziennik kalorii, makroskładników, wagi i obwodu pasa. Wpisy dodaje się przez formularz albo przez wklejenie tekstowego szablonu. Aplikacja nie korzysta z AI ani parsera języka naturalnego. Przeznaczona do użytku domowego w sieci LAN.
+CALICO is a simple log for calories, macronutrients, body weight and waist circumference. Entries are added through a form or by pasting a text template. The app uses no AI and no natural-language parser. It is meant for home use on a LAN.
 
-## Co robi aplikacja
+## What it does
 
-- prowadzi wpisy dzienne per użytkownik (PIN 4–8 cyfr),
-- zapisuje: `Waga`, `Obwód pasa`, `Śniadanie`, `Obiad`, `Kolacja`, `Przekąska`, `Bilans dnia`,
-- liczy sumę kcal i makro dnia oraz cel kcal (Mifflin-St Jeor × aktywność × korekta celu),
-- `Dziennik`: edycja, duplikowanie, przenoszenie i usuwanie pozycji, cofanie ostatniej zmiany, czyszczenie dnia,
-- `Raporty`: 7/30/90 dni, miesiąc, dowolny zakres — kalorie vs cel, bilans, najwyższy dzień, trend wagi (średnia 7-dniowa),
-- eksport i import danych w prostym formularzu CSV „wiersz = dzień” (pusty szablon do pobrania z aplikacji).
+- keeps daily entries per user (4–8 digit PIN),
+- records: `Weight`, `Waist`, `Breakfast`, `Lunch`, `Dinner`, `Snack`, `Daily balance`,
+- calculates the day's total kcal and macros, and the kcal target (Mifflin-St Jeor × activity × goal adjustment),
+- `Log`: edit, duplicate, move and delete entries, undo the last change, clear a day,
+- `Progress`: 7/30/90 days, month, custom range — calories vs target, balance, highest day, weight trend (7-day average),
+- data export and import as a simple "one row = one day" CSV (an empty template can be downloaded from the app).
 
-## Interfejs
+## Interface
 
-Mobile-first, ciemny motyw zgodny z brandingiem (`docs/UI design.md`): granatowe karty, akcenty cyan/teal, pierścień postępu jako główny motyw.
+Mobile-first, dark theme following the branding (`docs/UI design.md`): navy cards, cyan/teal accents, a progress ring as the main motif.
 
-- **Dziś** – przycisk „Dodaj posiłek” w prawym górnym rogu, pierścień kalorii (spożycie / cel), makroskładniki (postęp względem celu w g), karty wagi i obwodu pasa z mini-wykresami, regularność 7 dni („w celu” = ±10% celu kcal), cel kaloryczny i rekomendacja z oceny planu.
-- **Dziennik** – kalendarz miesięczny (kropka = dzień z wpisami: turkusowa – jedzenie, niebieska – tylko pomiary; klik wybiera dzień) oraz posiłki pogrupowane (Śniadanie, Obiad, Kolacja, Przekąski, Bilans dnia, Pomiary); dotknięcie pozycji otwiera akcje: edytuj, duplikuj, przenieś, usuń.
-- **Postępy** – 1M/3M/6M/1R/Wszystko/Własny: wykres wagi (z trendem 7 dni), obwodu, kalorii na tle celu, regularność tygodnia, historia dni.
-- **Cele** – aktualny plan (z możliwością zmiany daty startu), cele makro, waga planu vs średnia, waga docelowa z prognozą, ocena planu i akceptacja sugestii.
-- **Ustawienia** – profil i plan, zmiana PIN-u, eksport/import CSV, język (polski / English), usunięcie konta.
+- **Today** – "Add meal" button in the top right corner, calorie ring (intake / target), macros (progress towards the target in g), weight and waist cards with mini charts, 7-day consistency ("on target" = ±10% of the kcal target), calorie target and the recommendation from the plan review.
+- **Log** – monthly calendar (dot = day with entries: teal – food, blue – measurements only; tap to select a day) and meals grouped as Breakfast, Lunch, Dinner, Snacks, Daily balance, Measurements; tapping an entry opens actions: edit, duplicate, move, delete.
+- **Progress** – 1M/3M/6M/1Y/All/Custom: weight chart (with 7-day trend), waist, calories against the target, weekly consistency, day history.
+- **Goals** – current plan (start date can be changed), macro targets, plan weight vs average, target weight with forecast, plan review and accepting suggestions.
+- **Settings** – profile and plan, PIN change, CSV export/import, language (polski / English), account deletion.
 
-Nawigacja (Dziś, Postępy, Cele, Dziennik, Ustawienia, Wyloguj): dolny pasek na telefonie, boczny panel od 960 px (z nazwą zalogowanego użytkownika nad „Wyloguj”). Dodawanie i edycja w dolnych panelach. Font Inter (OFL) jest dołączony lokalnie (`frontend/fonts/`) – aplikacja nie pobiera nic z internetu.
+Navigation (Today, Progress, Goals, Log, Settings, Log out): bottom bar on phones, side panel from 960 px (with the signed-in user's name above "Log out"). Adding and editing happen in bottom sheets. The Inter font (OFL) is bundled locally (`frontend/fonts/`) – the app downloads nothing from the internet.
 
-### Języki (PL / EN)
+### Languages (PL / EN)
 
-Interfejs, komunikaty API, szablony tekstowe i pliki CSV działają po polsku i po angielsku. Przełącznik jest na ekranie logowania i w `Ustawieniach`. Wybór jest zapamiętany na urządzeniu i na koncie: po zalogowaniu obowiązuje język konta. Pierwsze uruchomienie bez wyboru: język przeglądarki (polski albo angielski).
+The interface, API messages, text templates and CSV files work in Polish and English. The switch is on the login screen and in `Settings`. The choice is remembered on the device and on the account: after signing in, the account language applies. On first launch with no choice made, the browser language is used (Polish or English).
 
-- Polski jest językiem źródłowym: teksty piszemy po polsku w kodzie i w `index.html`, a angielskie tłumaczenia są w słownikach `frontend/js/locales/en.js` i `backend/app/locales/en.py`. Kluczem jest polski tekst.
-- Frontend: `t("Tekst {param}", { param })`, `N_("Etykieta")` dla stałych, `plural(n, "dzień", "dni", "dni")`. Statyczny tekst i atrybuty (`placeholder`, `aria-label`, `title`, `alt`) z `index.html` tłumaczą się same.
-- Backend: `t("Tekst {param}", param=...)` z `app/i18n.py`. Język żądania z nagłówka `Accept-Language` (frontend wysyła wybrany język).
-- Kompletność pilnują `scripts/check_i18n.mjs` i `backend/tests/test_i18n.py` (w CI): tekst bez tłumaczenia EN, nieużywane tłumaczenie albo polski tekst z pominięciem `t()` blokują PR.
-- W bazie etykiety wpisów i `source_text` zostają po polsku (kanoniczne). API zwraca je w języku żądania (EN: `Dinner 2` zamiast `Kolacja Druga`). Parser szablonów rozumie oba języki (`Breakfast` / `Calories: 540`, `Date:`), CSV: PL – średnik i przecinek dziesiętny, EN – przecinek i kropka. Import przyjmuje oba.
+- Polish is the source language: texts are written in Polish in the code and in `index.html`, and English translations live in the dictionaries `frontend/js/locales/en.js` and `backend/app/locales/en.py`. The key is the Polish text.
+- Frontend: `t("Tekst {param}", { param })`, `N_("Etykieta")` for constants, `plural(n, "dzień", "dni", "dni")`. Static text and attributes (`placeholder`, `aria-label`, `title`, `alt`) in `index.html` are translated automatically.
+- Backend: `t("Tekst {param}", param=...)` from `app/i18n.py`. The request language comes from the `Accept-Language` header (the frontend sends the selected language).
+- Completeness is enforced by `scripts/check_i18n.mjs` and `backend/tests/test_i18n.py` (in CI): a text without an EN translation, an unused translation, or Polish text bypassing `t()` blocks the PR.
+- Entry labels and `source_text` are stored in Polish in the database (canonical form). The API returns them in the request language (EN: `Dinner 2` instead of `Kolacja Druga`). The template parser understands both languages (`Breakfast` / `Calories: 540`, `Date:`). CSV: PL – semicolon and decimal comma, EN – comma and decimal point. Import accepts both.
 
-### PWA i ikony
+### PWA and icons
 
-- `frontend/manifest.json`, `frontend/sw.js` (cache powłoki aplikacji; dane `/api` nigdy nie są cache'owane).
-- Ikony w `frontend/icons/` generuje skrypt z plików w `branding/`:
+- `frontend/manifest.json`, `frontend/sw.js` (app shell cache; `/api` data is never cached).
+- Icons in `frontend/icons/` are generated by a script from the files in `branding/`:
 
 ```bash
 docker run --rm -v "$PWD:/repo" -w /repo python:3.12-slim \
   sh -c "pip install -q pillow && python scripts/generate_icons.py"
 ```
 
-- Instalacja jako aplikacja (Android/Chrome, desktop) wymaga HTTPS albo `localhost` – przeglądarki nie uruchamiają service workera po zwykłym `http://` w sieci LAN. Na iOS „Dodaj do ekranu początkowego” działa także po HTTP (ikona `apple-touch-icon`).
+- Installing as an app (Android/Chrome, desktop) requires HTTPS or `localhost` – browsers do not start a service worker over plain `http://` on a LAN. On iOS, "Add to Home Screen" also works over HTTP (`apple-touch-icon`).
 
-## Najważniejsze reguły
+## Key rules
 
-- **Profil jest obowiązkowy i nie ma wartości domyślnych.** Nowy użytkownik po pierwszym odblokowaniu PIN-em musi uzupełnić profil: płeć, wiek, wzrost, aktualną wagę, aktywność, cel i korektę celu. Okna nie da się zamknąć ani pominąć, można jedynie zmienić użytkownika. Do tego czasu API danych zwraca `428`.
+- **The profile is mandatory and has no default values.** After the first PIN unlock, a new user must complete the profile: sex, age, height, current weight, activity, goal and goal adjustment. The dialog cannot be closed or skipped; the only alternative is switching user. Until then the data API returns `428`.
+- "Today" is computed in the `APP_TIMEZONE` time zone (default `Europe/Warsaw`).
+- Entry date: from `2000-01-01` up to and including tomorrow.
+- `Weight`, `Waist`, `Daily balance`: one entry per day, a new one overwrites the previous one. An edit/move that would create a second such entry returns 409.
+- Meals: any number per day, labelled `Breakfast`, `Breakfast 2`, `Lunch 2`, `Dinner 2`…
+- `Daily balance` replaces the sum of that day's meals.
+- The kcal target is a **plan**, not a formula result recalculated after every weigh-in. It changes only explicitly:
+  - saving the profile = a new plan calculated from the "plan weight" (saving with a changed weight also creates today's `Weight` entry),
+  - accepting a suggestion from the "Plan review" card (`Goals` tab).
+- `Weight` entries are for monitoring: the profile shows the current weight next to the plan weight, but the target does not change.
+- Plan review (`app/plan.py`): weight trend from a regression of measurements since the plan start (min. 4 measurements spanning 14 days), compared with the rate implied by the plan. Within range → target unchanged, even if the estimated TDEE has dropped. Out of range → "keep watching" for the first 21 days, then a suggested adjustment of 100–200 kcal (not below 1500 kcal for men / 1200 kcal for women). When food entries cover ≥ 70% of days, TDEE is also estimated from actual intake and weight change.
+- A target change updates today's and future days' targets; past days keep their target.
+- Target weight (optional, `Goals` tab) is used only for the forecast: the date it will be reached is calculated from the weight trend in the plan review, or without a trend, from the rate implied by the plan. It does not change the kcal target (D2b).
+- Macro targets (g) are by default derived from the day's kcal target: protein 25% and fat 30% of energy, carbs fill the rest (constants `MACRO_AUTO_*` in `services.py`). Custom targets in the `Goals` tab are optional – each field separately, empty = automatic; if you enter only protein or fat, carbs still fill the kcal target. Changing macro targets does not change the kcal plan. On "Today" the bars show progress towards the target; exceeding it is shown in amber.
+- Reports compute averages and days above/below target only from days with a food entry (meal or daily balance).
+- Value ranges: kcal 0–10,000, macros 0–1,000 g, weight 30–300 kg, waist 30–250 cm.
 
-- „Dzisiaj” liczone jest w strefie `APP_TIMEZONE` (domyślnie `Europe/Warsaw`).
-- Data wpisu: od `2000-01-01` do jutra włącznie.
-- `Waga`, `Obwód pasa`, `Bilans dnia`: jeden wpis na dzień, nowy nadpisuje poprzedni. Edycja/przeniesienie, które utworzyłoby drugi taki wpis, zwraca błąd 409.
-- Posiłki: dowolnie wiele w ciągu dnia, etykiety `Śniadanie`, `Śniadanie Drugie`, `Obiad Drugi`, `Kolacja Druga`…
-- `Bilans dnia` zastępuje sumę posiłków z tego dnia.
-- Cel kcal to **plan**, a nie wynik wzoru po każdym ważeniu. Zmienia się tylko jawnie:
-  - zapis profilu = nowy plan liczony wzorem z „wagi planu” (zapis ze zmienioną wagą tworzy też dzisiejszy wpis `Waga`),
-  - akceptacja sugestii z karty „Ocena planu” (zakładka `Cele`).
-- Wpisy `Waga` służą do monitorowania: profil pokazuje aktualną wagę obok wagi planu, ale cel się nie zmienia.
-- Ocena planu (`app/plan.py`): trend masy z regresji pomiarów od startu planu (min. 4 pomiary z 14 dni), porównany z tempem wynikającym z planu. W zakresie → cel bez zmian, nawet jeśli szacowane TDEE spadło. Poza zakresem → przez pierwsze 21 dni „obserwuj”, potem sugestia korekty o 100–200 kcal (nie poniżej 1500 kcal dla mężczyzn / 1200 kcal dla kobiet). Gdy wpisy jedzenia pokrywają ≥ 70% dni, TDEE jest szacowane także z faktycznego spożycia i zmiany masy.
-- Zmiana celu aktualizuje cel dnia dzisiejszego i przyszłych; przeszłe dni zachowują swój cel.
-- Waga docelowa (opcjonalna, zakładka `Cele`) służy tylko prognozie: data osiągnięcia liczona z trendu masy z oceny planu, a bez trendu – z tempa wynikającego z planu. Nie zmienia celu kcal (D2b).
-- Cele makro (g) są domyślnie wyliczane z celu kcal dnia: białko 25% i tłuszcze 30% energii, węglowodany dopełniają resztę (stałe `MACRO_AUTO_*` w `services.py`). Własne cele w zakładce `Cele` są opcjonalne – każde pole osobno, puste = automatycznie; gdy wpiszesz tylko białko lub tłuszcze, węglowodany dalej dopełniają cel kcal. Zmiana celów makro nie zmienia planu kcal. Na „Dziś” paski pokazują postęp względem celu; przekroczenie jest bursztynowe.
-- Raporty liczą średnie i dni powyżej/poniżej celu tylko z dni, w których jest wpis jedzenia (posiłek lub bilans).
-- Zakresy wartości: kcal 0–10 000, makro 0–1 000 g, waga 30–300 kg, obwód 30–250 cm.
-
-## Szablony tekstowe (zakładka Dzień → „Wklej tekst”)
+## Text templates (Log → "Paste text")
 
 ```text
-Waga: 82,4 kg
+Weight: 82.4 kg
 ```
 
 ```text
-Obwód pasa: 91 cm
+Waist: 91 cm
 ```
 
 ```text
-Śniadanie
-Ilość kalorii: 540
-Węglowodany: 48
-Tłuszcze: 18
-Białko: 32
+Breakfast
+Calories: 540
+Carbs: 48
+Fat: 18
+Protein: 32
 ```
 
-Nagłówki: `Śniadanie`, `Obiad`, `Kolacja`, `Przekąska`, `Bilans dnia`. Polskie znaki są opcjonalne (`Sniadanie`, `Ilosc kalorii` też działa), liczby z przecinkiem lub kropką, jednostki opcjonalne.
+Headers: `Breakfast`, `Lunch`, `Dinner`, `Snack`, `Daily balance`. Numbers with a comma or a dot, units optional. Polish templates work too (`Śniadanie`, `Ilość kalorii: 540`, `Węglowodany`, `Tłuszcze`, `Białko`), with or without Polish diacritics (`Sniadanie`, `Ilosc kalorii`).
 
-Inny dzień — pierwsza linia `Data:` (`RRRR-MM-DD`, `DD.MM.RRRR`, `DD-MM-RRRR`, `DD/MM/RRRR`):
+A different day — first line `Date:` (`YYYY-MM-DD`, `DD.MM.YYYY`, `DD-MM-YYYY`, `DD/MM/YYYY`):
 
 ```text
-Data: 2026-08-03
-Kolacja
-Ilość kalorii: 610
-Węglowodany: 40
-Tłuszcze: 22
-Białko: 38
+Date: 2026-08-03
+Dinner
+Calories: 610
+Carbs: 40
+Fat: 22
+Protein: 38
 ```
 
-Komendy tekstowe (cała wiadomość): `pokaż dziś`, `cofnij ostatni`, `usuń 2`, `pomoc`.
+Text commands (whole message): `show today`, `undo`, `delete 2`, `help` (Polish: `pokaż dziś`, `cofnij ostatni`, `usuń 2`, `pomoc`).
 
-## Start
+## Getting started
 
 ```bash
 cp .env.example .env
 docker compose up --build -d
 ```
 
-Otwórz `http://localhost:8080`. Przy pierwszym starcie nie ma żadnego użytkownika ani PIN-u domyślnego – aplikacja prosi o utworzenie pierwszego użytkownika (nazwa i PIN), a potem wymusza uzupełnienie profilu. PIN można zmienić w zakładce `Ustawienia`.
+Open `http://localhost:8080`. On first launch there is no user and no default PIN – the app asks you to create the first user (name and PIN) and then requires completing the profile. The PIN can be changed in `Settings`.
 
-Istniejące instalacje zachowują swoich użytkowników (także dawnego „Domyślnego Użytkownika” – można go usunąć po założeniu własnego konta). Klucz `DEFAULT_USER_PIN` w `.env` jest ignorowany i można go usunąć.
+Existing installations keep their users (including the former "Domyślny Użytkownik" default user – it can be deleted after creating your own account). The `DEFAULT_USER_PIN` key in `.env` is ignored and can be removed.
 
-Aplikacja działa w jednym kontenerze: FastAPI serwuje API i pliki frontendu. Dane są w wolumenie `calico_data` (`/data/calico.db`).
+The app runs in a single container: FastAPI serves both the API and the frontend files. Data is stored in the `calico_data` volume (`/data/calico.db`).
 
-Aktualizacja z wersji z Caddy (dwa kontenery `backend` + `proxy`):
+Upgrading from the Caddy-based version (two containers, `backend` + `proxy`):
 
 ```bash
 docker compose up --build -d --remove-orphans
 ```
 
-Wolumen z danymi zostaje ten sam. Przy pierwszym starcie baza jest migrowana automatycznie (wersja schematu w tabeli `app_meta`, klucz `schema_version`).
+The data volume stays the same. On first start the database is migrated automatically (schema version in the `app_meta` table, key `schema_version`).
 
-## Konfiguracja (`.env`)
+## Configuration (`.env`)
 
-| Zmienna | Domyślnie | Opis |
+| Variable | Default | Description |
 |---|---|---|
-| `APP_TIMEZONE` | `Europe/Warsaw` | strefa, w której liczony jest „dzisiejszy” dzień |
-| `SQLITE_PATH` | `/data/calico.db` | ścieżka bazy |
-| `CORS_ORIGIN` | pusty | pusty = brak CORS (frontend i API na tym samym adresie) |
-| `ALLOW_SIGNUP` | `true` | `false` = nowe konta można zakładać tylko przy pierwszym starcie (gdy nie ma żadnego użytkownika); `POST /api/users` zwraca wtedy `403` |
-| `SESSION_TTL_HOURS` | `12` | jak długo ważna jest sesja po odblokowaniu PIN-em |
-| `SESSION_SECRET` | pusty | klucz podpisu sesji; pusty = generowany automatycznie i zapisany w bazie |
+| `APP_TIMEZONE` | `Europe/Warsaw` | time zone used to determine "today" |
+| `SQLITE_PATH` | `/data/calico.db` | database path |
+| `CORS_ORIGIN` | empty | empty = no CORS (frontend and API on the same origin) |
+| `ALLOW_SIGNUP` | `true` | `false` = new accounts can only be created on first launch (when no user exists); `POST /api/users` then returns `403` |
+| `SESSION_TTL_HOURS` | `12` | how long a session stays valid after a PIN unlock |
+| `SESSION_SECRET` | empty | session signing key; empty = generated automatically and stored in the database |
 
 ## API
 
-Komunikaty i teksty w odpowiedziach są w języku z nagłówka `Accept-Language` (`pl` domyślnie, `en`). Wszystkie endpointy danych wymagają parametru `user_id` (query albo ścieżka) oraz uwierzytelnienia: `Authorization: Bearer <token>` (token z `POST /api/auth/verify`, ważny `SESSION_TTL_HOURS`) albo nagłówka `X-User-PIN`. Błędy: `401` zły PIN, `403` zakładanie kont wyłączone, `404` brak obiektu, `409` konflikt (np. drugi wpis `Waga` w dniu), `422` niepoprawne dane, `429` PIN zablokowany po błędnych próbach, `428` profil nieuzupełniony (dotyczy dni, wpisów, raportów, planu, eksportu i czatu).
+Messages and texts in responses use the language from the `Accept-Language` header (`pl` by default, `en`). All data endpoints require a `user_id` parameter (query or path) and authentication: `Authorization: Bearer <token>` (token from `POST /api/auth/verify`, valid for `SESSION_TTL_HOURS`) or the `X-User-PIN` header. Errors: `401` wrong PIN, `403` signup disabled, `404` object not found, `409` conflict (e.g. a second `Weight` entry on a day), `422` invalid data, `429` PIN locked after failed attempts, `428` profile not completed (applies to days, entries, reports, plan, export and chat).
 
-Użytkownicy i profil:
+Users and profile:
 
-- `GET /api/users` (pusta lista = pierwszy start), `POST /api/users` — `{"display_name": "Ala", "pin": "2468"}` (`403`, gdy `ALLOW_SIGNUP=false` i istnieje już użytkownik), `DELETE /api/users/{user_id}`
-- `POST /api/users/{user_id}/pin` — `{"new_pin": "5678"}`; unieważnia stare tokeny i zwraca nowy
-- `PUT /api/users/{user_id}/language` — `{"language": "en"}` (`pl`/`en`); `POST /api/auth/verify` zwraca zapamiętany `language`
-- Blokada PIN-u: po 5 błędnych próbach konto jest blokowane na 5 min, kolejne serie po 10, 20, 40 i maks. 60 min (`429` z nagłówkiem `Retry-After`, także przy poprawnym PIN-ie). Poprawny PIN zeruje licznik. Otwarta sesja (token) działa dalej. Stałe `PIN_*` w `services.py`.
+- `GET /api/users` (empty list = first launch), `POST /api/users` — `{"display_name": "Ala", "pin": "2468"}` (`403` when `ALLOW_SIGNUP=false` and a user already exists), `DELETE /api/users/{user_id}`
+- `POST /api/users/{user_id}/pin` — `{"new_pin": "5678"}`; invalidates old tokens and returns a new one
+- `PUT /api/users/{user_id}/language` — `{"language": "en"}` (`pl`/`en`); `POST /api/auth/verify` returns the stored `language`
+- PIN lockout: after 5 failed attempts the account is locked for 5 min, subsequent series for 10, 20, 40 and max. 60 min (`429` with a `Retry-After` header, also for a correct PIN). A correct PIN resets the counter. An open session (token) keeps working. Constants `PIN_*` in `services.py`.
 - `POST /api/auth/verify` — `{"user_id": 1, "pin": "1234"}` → `{"ok": true, "token": "…", "expires_at": "…"}`
-- `GET|PUT /api/profile/{user_id}` — `is_complete=false` i puste pola, dopóki profil nie zostanie zapisany; `PUT` wymaga wszystkich pól. `weight_kg` to waga planu, `current_weight_kg` to ostatni pomiar. `macro_targets`: obowiązujące cele `protein_g`, `fat_g`, `carbs_g` oraz `manual_*` (null = automatycznie)
-- `PUT /api/profile/{user_id}/macros` — `{"protein_g": 170}`; pola opcjonalne (brak/null = automatycznie, `{}` przywraca automatyczne), zakresy: białko 0–500, tłuszcze 0–400, węglowodany 0–1000 g
-- `POST /api/profile/{user_id}/preview` — podgląd BMR/TDEE/celu dla danych z formularza (bez zapisu, działa przed uzupełnieniem profilu)
-- `PUT /api/profile/{user_id}/plan-start` — `{"plan_started_on": "2026-03-01"}`; ręczna data startu planu (np. po imporcie danych historycznych): nie później niż dziś, cel kcal bez zmian, waga planu = średnia pomiarów z 7 dni przed tą datą (bez nich – pierwszy pomiar do 7 dni po niej)
-- `PUT /api/profile/{user_id}/target-weight` — `{"target_weight_kg": 85}` albo `null` (usuwa); 30–300 kg
-- `GET /api/profile/{user_id}/plan` — ocena planu (status, trend, TDEE, sugestia) oraz prognoza wagi docelowej: `target_weight_kg`, `target_weight_remaining_kg`, `forecast_date`, `forecast_basis` (`trend` – z pomiarów z ostatnich 28 dni, także sprzed startu planu / `plan`), `forecast_message`
-- `POST /api/profile/{user_id}/plan/apply` — `{"target_kcal": 2460}` akceptuje bieżącą sugestię (409, jeśli się zmieniła)
+- `GET|PUT /api/profile/{user_id}` — `is_complete=false` and empty fields until the profile is saved; `PUT` requires all fields. `weight_kg` is the plan weight, `current_weight_kg` is the latest measurement. `macro_targets`: effective targets `protein_g`, `fat_g`, `carbs_g` and `manual_*` (null = automatic)
+- `PUT /api/profile/{user_id}/macros` — `{"protein_g": 170}`; fields optional (missing/null = automatic, `{}` restores automatic), ranges: protein 0–500, fat 0–400, carbs 0–1000 g
+- `POST /api/profile/{user_id}/preview` — BMR/TDEE/target preview for form data (no save, works before the profile is completed)
+- `PUT /api/profile/{user_id}/plan-start` — `{"plan_started_on": "2026-03-01"}`; manual plan start date (e.g. after importing historical data): not later than today, kcal target unchanged, plan weight = average of measurements from the 7 days before that date (without them – the first measurement up to 7 days after it)
+- `PUT /api/profile/{user_id}/target-weight` — `{"target_weight_kg": 85}` or `null` (removes it); 30–300 kg
+- `GET /api/profile/{user_id}/plan` — plan review (status, trend, TDEE, suggestion) and target weight forecast: `target_weight_kg`, `target_weight_remaining_kg`, `forecast_date`, `forecast_basis` (`trend` – from measurements in the last 28 days, including before the plan start / `plan`), `forecast_message`
+- `POST /api/profile/{user_id}/plan/apply` — `{"target_kcal": 2460}` accepts the current suggestion (409 if it has changed)
 
-Dni i wpisy (odczyt nigdy nie tworzy dnia w bazie):
+Days and entries (reads never create a day in the database):
 
 - `GET /api/days/current?user_id=`
-- `GET /api/days?user_id=&limit=&date_from=&date_to=` — tylko dni z wpisami (zakres dat używa kalendarz Dziennika)
-- `GET /api/days/{date}?user_id=` — sumy dnia, wpisy oraz cele makro dnia `target_protein_g`, `target_fat_g`, `target_carbs_g` (liczone od celu kcal dnia; także w `GET /api/days` i `/api/days/current`)
-- `POST /api/days/{date}/entries?user_id=` — `{"entry_type": "lunch", "kcal": 600, "carbs_g": 60, "fat_g": 20, "protein_g": 40}` lub `{"entry_type": "weight", "weight_kg": 82.4}`
-- `PATCH /api/days/{date}/entries/{id}?user_id=` — `{"entry": {...}}` albo `{"source_text": "..."}`
+- `GET /api/days?user_id=&limit=&date_from=&date_to=` — only days with entries (the date range is used by the Log calendar)
+- `GET /api/days/{date}?user_id=` — day totals, entries and the day's macro targets `target_protein_g`, `target_fat_g`, `target_carbs_g` (derived from the day's kcal target; also in `GET /api/days` and `/api/days/current`)
+- `POST /api/days/{date}/entries?user_id=` — `{"entry_type": "lunch", "kcal": 600, "carbs_g": 60, "fat_g": 20, "protein_g": 40}` or `{"entry_type": "weight", "weight_kg": 82.4}`
+- `PATCH /api/days/{date}/entries/{id}?user_id=` — `{"entry": {...}}` or `{"source_text": "..."}`
 - `POST /api/days/{date}/entries/{id}/move?user_id=` — `{"target_date": "2026-06-14"}`
-- `POST /api/days/{date}/entries/{id}/duplicate?user_id=` — `{"target_date": null}` (null = ten sam dzień)
+- `POST /api/days/{date}/entries/{id}/duplicate?user_id=` — `{"target_date": null}` (null = same day)
 - `DELETE /api/days/{date}/entries/{id}?user_id=`
-- `POST /api/days/{date}/undo?user_id=` — usuwa ostatnio dodaną/zmienioną pozycję dnia
+- `POST /api/days/{date}/undo?user_id=` — removes the most recently added/changed entry of the day
 - `POST /api/days/{date}/clear?user_id=`
 
-Raporty i eksport:
+Reports and export:
 
 - `GET /api/reports/summary?user_id=&days=7`
-- `GET /api/reports/range?user_id=&date_from=&date_to=` (maks. 3660 dni)
-- `GET /api/reports/month?user_id=&month=RRRR-MM`
-- `GET /api/export?user_id=` — CSV „wiersz = dzień”: `Data;Waga (kg);Obwód pasa (cm);Kalorie (kcal);Białko (g);Węglowodany (g);Tłuszcze (g)` (średnik, UTF-8 z BOM, przecinek dziesiętny; posiłki zsumowane do dnia)
-- `GET /api/import/template?user_id=` — pusty szablon w tym samym formacie (wiersze zaczynające się od `#` są pomijane)
-- `POST /api/import?user_id=` — `{"content": "<tekst CSV>"}` → `{"imported_days", "imported_entries", "skipped_dates", "errors": [{"row", "message"}], "error_count", "earliest_imported_date", "plan_started_on"}` (`earliest_imported_date` tylko, gdy zaimportowane dane sięgają przed start planu – UI podpowiada wtedy zmianę daty startu). Najpierw walidowany jest cały plik – przy błędach nic nie jest zapisywane. Dni z istniejącymi wpisami są pomijane. Kalorie i makro → „Bilans dnia” (makro opcjonalne), waga i obwód → osobne wpisy. Akceptuje też przecinek/tabulator jako separator, nagłówki bez polskich znaków i w dowolnej kolejności oraz daty `DD.MM.RRRR`
+- `GET /api/reports/range?user_id=&date_from=&date_to=` (max. 3660 days)
+- `GET /api/reports/month?user_id=&month=YYYY-MM`
+- `GET /api/export?user_id=` — "one row = one day" CSV. PL: `Data;Waga (kg);Obwód pasa (cm);Kalorie (kcal);Białko (g);Węglowodany (g);Tłuszcze (g)` (semicolon, UTF-8 with BOM, decimal comma); EN: `Date,Weight (kg),Waist (cm),Calories (kcal),Protein (g),Carbs (g),Fat (g)` (comma, decimal point). Meals are summed per day
+- `GET /api/import/template?user_id=` — empty template in the same format (rows starting with `#` are skipped)
+- `POST /api/import?user_id=` — `{"content": "<CSV text>"}` → `{"imported_days", "imported_entries", "skipped_dates", "errors": [{"row", "message"}], "error_count", "earliest_imported_date", "plan_started_on"}` (`earliest_imported_date` only when the imported data goes back before the plan start – the UI then suggests changing the start date). The whole file is validated first – if there are errors, nothing is saved. Days that already have entries are skipped. Calories and macros → "Daily balance" (macros optional), weight and waist → separate entries. Also accepts comma/tab as separator, headers in either language, with or without Polish diacritics and in any order, and `DD.MM.YYYY` dates
 
-Czat tekstowy: `POST /api/chat/message` — odpowiedź ma pole `kind`: `saved`, `info` albo `error`.
+Text chat: `POST /api/chat/message` — the response has a `kind` field: `saved`, `info` or `error`.
 
-Pozostałe: `GET /health`, `GET /api/meta` (dzisiejsza data serwera, strefa, `allow_signup`).
+Other: `GET /health`, `GET /api/meta` (server's today date, time zone, `allow_signup`).
 
-## Testy
+## Tests
 
 ```bash
 cd backend
@@ -185,20 +184,21 @@ docker run --rm -v "$PWD:/app" -w /app -e PYTHONPATH=/app python:3.12-slim \
   sh -c "pip install -q -r requirements.txt -r requirements-dev.txt && pytest -q -p no:cacheprovider"
 ```
 
-Pełne sprawdzenie jak w CI (ruff + pytest w kontenerze, `node --check` modułów frontendu lokalnie): `./scripts/check.sh`. CI (GitHub Actions) uruchamia to samo przy pushu na `dev`/`main` i w każdym PR.
+Full check as in CI (ruff + pytest in a container, `node --check` of frontend modules locally): `./scripts/check.sh`. CI (GitHub Actions) runs the same on pushes to `dev`/`main` and on every PR.
 
-## Bezpieczeństwo
+## Security
 
-- Aplikacja jest przeznaczona do sieci domowej. Nie wystawiaj jej do internetu bez reverse proxy z TLS i dodatkowego uwierzytelnienia.
-- PIN haszowany PBKDF2-SHA256 (120 tys. iteracji), porównanie w czasie stałym.
-- Po 5 błędnych PIN-ach konto jest czasowo blokowane (5 → 10 → 20 → 40 → 60 min). `ALLOW_SIGNUP=false` blokuje zakładanie kolejnych kont przez każdego w sieci.
-- Po odblokowaniu przeglądarka dostaje podpisany token sesji (HMAC-SHA256, ważny 12 h) i trzyma go w `sessionStorage`: sesja przetrwa przeładowanie karty (np. gdy telefon uśpi przeglądarkę w tle), znika po zamknięciu karty i po wylogowaniu. PIN nie jest nigdzie zapisywany. Zmiana PIN-u unieważnia wszystkie wcześniejsze sesje.
-- Nagłówki `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`.
-- SQLite w trybie `WAL`, `foreign_keys=ON`; sekrety poza repo (`.env` w `.gitignore`).
+- The app is meant for a home network. Do not expose it to the internet without a reverse proxy with TLS and additional authentication.
+- PIN hashed with PBKDF2-SHA256 (120k iterations), constant-time comparison.
+- After 5 failed PINs the account is temporarily locked (5 → 10 → 20 → 40 → 60 min). `ALLOW_SIGNUP=false` prevents anyone on the network from creating more accounts.
+- After unlocking, the browser receives a signed session token (HMAC-SHA256, valid for 12 h) and keeps it in `sessionStorage`: the session survives a tab reload (e.g. when a phone suspends the browser in the background) and disappears when the tab is closed or on logout. The PIN is never stored. Changing the PIN invalidates all earlier sessions.
+- `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` headers.
+- SQLite in `WAL` mode, `foreign_keys=ON`; secrets kept out of the repo (`.env` in `.gitignore`).
 
-## Dokumentacja projektu
+## Project documentation
 
-- `docs/decisions.md` — decyzje produktowe i zadania otwarte (źródło prawdy dla dalszych prac),
-- `AGENTS.md` — instrukcje dla agentów AI,
-- `docs/UI design.md` — system wizualny i zasady UI (źródło prawdy dla wyglądu),
-- `docs/mockups/` — wcześniejsze mockupy UI (historyczne).
+Internal project documents are written in Polish (the project's working language).
+
+- `docs/decisions.md` — product decisions and open tasks (source of truth for further work),
+- `AGENTS.md` — instructions for AI agents,
+- `docs/UI design.md` — visual system and UI rules (source of truth for the look).
