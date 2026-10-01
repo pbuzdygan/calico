@@ -173,10 +173,13 @@ docker run --rm -v "$PWD:/app" -w /app -e PYTHONPATH=/app python:3.12-slim \
   sh -c "pip install -q -r requirements.txt -r requirements-dev.txt && pytest -q -p no:cacheprovider"
 ```
 
+Pełne sprawdzenie jak w CI (ruff + pytest w kontenerze, `node --check` modułów frontendu lokalnie): `./scripts/check.sh`. CI (GitHub Actions) uruchamia to samo przy pushu na `dev`/`main` i w każdym PR.
+
 ## Bezpieczeństwo
 
 - Aplikacja jest przeznaczona do sieci domowej. Nie wystawiaj jej do internetu bez reverse proxy z TLS i dodatkowego uwierzytelnienia.
 - PIN haszowany PBKDF2-SHA256 (120 tys. iteracji), porównanie w czasie stałym.
+- Po 5 błędnych PIN-ach konto jest czasowo blokowane (5 → 10 → 20 → 40 → 60 min). `ALLOW_SIGNUP=false` blokuje zakładanie kolejnych kont przez każdego w sieci.
 - Po odblokowaniu przeglądarka dostaje podpisany token sesji (HMAC-SHA256, ważny 12 h) i trzyma go w `sessionStorage`: sesja przetrwa przeładowanie karty (np. gdy telefon uśpi przeglądarkę w tle), znika po zamknięciu karty i po wylogowaniu. PIN nie jest nigdzie zapisywany. Zmiana PIN-u unieważnia wszystkie wcześniejsze sesje.
 - Nagłówki `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`.
 - SQLite w trybie `WAL`, `foreign_keys=ON`; sekrety poza repo (`.env` w `.gitignore`).

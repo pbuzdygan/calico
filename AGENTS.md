@@ -52,6 +52,8 @@ docker run --rm -v "$PWD:/app" -w /app -e PYTHONPATH=/app python:3.12-slim \
 
 Sprawdzenie składni frontendu: `for f in frontend/js/*.js frontend/js/views/*.js; do node --check "$f"; done`.
 
+Wszystko naraz, tak jak CI (`.github/workflows/ci.yml`: ruff + pytest + `node --check`): `./scripts/check.sh`. Lint backendu: `ruff` (konfiguracja `backend/ruff.toml`) – nowy kod musi go przechodzić.
+
 ## Wygląd (UI)
 
 - **Źródło prawdy: `docs/UI design.md`.** Ciemny granat, akcenty cyan/teal, pierścień postępu jako motyw marki; bez jasnych teł, ilustracji i „wellness” palety.

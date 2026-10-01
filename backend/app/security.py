@@ -6,7 +6,6 @@ import os
 import re
 import secrets
 
-
 PIN_PATTERN = re.compile(r"^\d{4,8}$")
 
 

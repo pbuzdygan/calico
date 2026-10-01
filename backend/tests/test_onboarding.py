@@ -72,7 +72,7 @@ def test_migration_marks_never_saved_profiles_incomplete(client, fresh_api):
     """Profile z wartosciami domyslnymi (updated_at == created_at) sa niekompletne; zapisane pozniej - kompletne."""
     import os
 
-    from app.db import _migration_4_profile_completion, SessionLocal
+    from app.db import SessionLocal, _migration_4_profile_completion
 
     other = client.post("/api/users", json={"display_name": "Zapisany Profil", "pin": "1357"}).json()
     con = sqlite3.connect(os.environ["SQLITE_PATH"])

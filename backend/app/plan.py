@@ -74,7 +74,7 @@ def _slope_kg_per_day(points: list[_Measurement]) -> float:
     denominator = sum((x - mean_x) ** 2 for x in xs)
     if denominator == 0:
         return 0.0
-    return sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys)) / denominator
+    return sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys, strict=True)) / denominator
 
 
 def _intake(db: Session, user_id: int, date_from: date, date_to: date) -> tuple[float | None, float]:
