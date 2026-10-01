@@ -198,8 +198,7 @@ Pełne sprawdzenie jak w CI (ruff + pytest w kontenerze, `node --check` modułó
 
 ## Dokumentacja projektu
 
-- `docs/review-2026-09-30.md` — przegląd, decyzje produktowe i backlog (źródło prawdy dla dalszych prac),
+- `docs/decisions.md` — decyzje produktowe i zadania otwarte (źródło prawdy dla dalszych prac),
 - `AGENTS.md` — instrukcje dla agentów AI,
-- `docs/ui-expansion-plan.md` — plan historyczny,
 - `docs/UI design.md` — system wizualny i zasady UI (źródło prawdy dla wyglądu),
 - `docs/mockups/` — wcześniejsze mockupy UI (historyczne).

@@ -20,7 +20,7 @@ CALICO — dziennik kalorii, makroskładników, wagi i obwodu pasa. Wpisy przez 
 
 ## Aktualny stan i backlog
 
-**Zanim zaczniesz: przeczytaj `docs/review-2026-09-30.md`.** Zawiera znaleziska (`BUG-xx`, `SEC-xx`, `UX-xx`, `TECH-xx`), decyzje właściciela (`D1`–`D7`, sekcja 8 — już rozstrzygnięte) i backlog (`T0.x` … `T3.x`) ze statusem. `docs/ui-expansion-plan.md` jest planem historycznym.
+**Zanim zaczniesz: przeczytaj `docs/decisions.md`.** Zawiera obowiązujące decyzje właściciela (`D1`–`D12`, już rozstrzygnięte) i zadania otwarte. Historia (pierwotny przegląd, zrobione zadania) jest w git – odnośniki w nagłówku tego pliku.
 
 Kluczowe decyzje produktowe (nie zmieniaj bez zgody właściciela):
 - brak statusu dnia (otwarty/zamknięty) — usunięty (D1),
@@ -81,4 +81,4 @@ Wszystko naraz, tak jak CI (`.github/workflows/ci.yml`: ruff + pytest + `node --
 - Kontrola: `node scripts/check_i18n.mjs` i `tests/test_i18n.py` (CI, `scripts/check.sh`) – brak tłumaczenia, martwy wpis albo polski tekst z pominięciem `t()` to błąd. Nie obchodź ich – dopisz tłumaczenie.
 - Frontend: każdy tekst z danych wstawiany do HTML przez `escapeHtml()` albo `textContent`. Komunikaty dla użytkownika przez `toast()`; akcje z przyciskami przez `withBusy()`.
 - Nie commituj `.env`, baz `*.db` ani plików z `/data`.
-- Po zakończeniu zadania zaktualizuj jego status w `docs/review-2026-09-30.md`.
+- Po zakończeniu zadania usuń je z zadań otwartych w `docs/decisions.md`; nowa decyzja właściciela = nowy wiersz w sekcji 1.
