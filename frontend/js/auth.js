@@ -10,7 +10,8 @@ import { rerenderProgressCharts } from "./views/progress.js";
 // --- blokada i sesja -------------------------------------------------------------------------------
 
 export function showScreen(name) {
-  // name === null: nic nie pokazuj (wznawianie sesji po przeładowaniu, bez mignięcia ekranu blokady)
+  // name === null: zostaje ekran startowy (wznawianie sesji po przeładowaniu, bez mignięcia ekranu blokady)
+  el.bootScreen.hidden = name !== null;
   el.lockScreen.hidden = name !== "lock";
   el.app.hidden = name !== "app";
 }

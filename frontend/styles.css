@@ -500,6 +500,35 @@ input[type="date"] {
   display: none;
 }
 
+/* --- ekran startowy (do decyzji JS: blokada albo wznowiona sesja) ------------------------------- */
+
+.boot-screen {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--bg-app);
+}
+
+.boot-screen img {
+  opacity: 0.85;
+  filter: drop-shadow(0 12px 40px rgba(32, 213, 255, 0.25));
+  animation: boot-pulse 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes boot-pulse {
+  from {
+    opacity: 0.45;
+  }
+}
+
+.boot-noscript {
+  position: fixed;
+  inset: auto 0 24px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
 /* --- ekran blokady ------------------------------------------------------------------ */
 
 .lock-screen {

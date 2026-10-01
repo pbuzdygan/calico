@@ -55,7 +55,14 @@
     </svg>
 
     <!-- EKRAN BLOKADY -->
-    <section id="lockScreen" class="lock-screen" aria-labelledby="lockTitle">
+    <!-- Ekran startowy: widoczny do chwili, gdy JS zdecyduje (ekran blokady albo wznowiona sesja).
+         Bez niego przy twardym przeładowaniu (Ctrl+Shift+R) na moment mignąłby ekran blokady. -->
+    <div id="bootScreen" class="boot-screen" aria-hidden="true">
+      <img src="/icons/logo-256.png" width="96" height="96" alt="" />
+    </div>
+    <noscript><p class="boot-noscript">CALICO wymaga włączonego JavaScriptu.</p></noscript>
+
+    <section id="lockScreen" class="lock-screen" aria-labelledby="lockTitle" hidden>
       <div class="lock-card">
         <h1 id="lockTitle" class="lock-banner">
           <img src="/icons/banner-720.jpg" srcset="/icons/banner-720.jpg 720w, /icons/banner-1200.jpg 1200w" width="1219" height="453" sizes="(min-width: 560px) 520px, calc(100vw - 32px)" alt="CALICO – świadome nawyki, realne efekty" fetchpriority="high" />
